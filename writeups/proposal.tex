@@ -1,0 +1,186 @@
+\documentclass{article}
+\usepackage[citestyle=numeric]{biblatex}
+\usepackage{fullpage}
+\addbibresource{library.bib}
+
+\title{Real-Time Rodent Tracking}
+\author{Eric Jonas}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Here I propose a short-duration project (four to six weeks) with two
+goals: advance the state-of-the-art in rodent behavioral tracking for
+awake behaving electrophysiology and to expand my understanding of
+sequential Monte Carlo methods.
+\end{abstract}
+
+
+\section{Motivation}
+Sequential Monte Carlo (SMC) methods differ tremendously in both
+mathematical foundation and practical application from the
+Markov-Chain Monte Carlo methods that I have been using successfully
+for the past five years. They excel in time-series models with
+ever-expanding state-spaces and long-running correlations, but at the
+same time provide weaker asymptotic guarantees than MCMC. Part of my
+research/academic interest has been determining which inference
+methods let me focus on building more complex models without worry
+about inference details. I believe that some recent advances in SMC
+methods might be getting us close to that point, but this is
+based on a cursory review of the literature and a very limited
+background.
+
+Simultaneously, it has been a very long time since I've looked at
+non-econometric time series, and I've never tackled a tracking problem
+before. I miss working with real data in a neural context, and if I'm
+going to attempt to contribute going forward to the field of neural
+data analysis, I'm going to need more experience. And I'm on vacation,
+and this is a lot more fun than going to the beach.
+
+\section{Proposal}
+
+Currently animals are tracked using software that implements various
+heuristics and, in regions of uncertainty, asks for human
+intervention. The utility of this approach is the resulting tracking
+data is very ``clean'' for downstream analysis, with the downside that
+in complex environments a great deal of human annotation is necessary.
+
+I propose developing a state-space model that explicitly models the
+animal's location, orientation, and other kinematic properties to
+enable high-fidelity reconstruction of the animal's position. I'm
+breaking this down into three components:
+
+\begin{itemize}
+\item \textbf{Phase 1} : sequential state estimation -- develop various
+  models for estimating the animal's position $x_t$ at time $t$ (the
+  ``filtering'' problem). Implement and evaluate those models across
+  existing data sets.
+\item \textbf{Phase 2} : smoothing -- higher quality results should be
+  possible exploiting data from $1..T$ to estimate $x_t$. Smoothing
+  algorithms are more suited for offline analysis, but are generally
+  more complex and have higher memory requirements.
+\item \textbf{Phase 3} : online / real-time tracking -- implement the
+  filtering algorithm with constant-memory and constant-runtime
+  performance in a manner suitable for use in real-time applications,
+  and optionally extend with more real-time sensors (such as
+  accelerometers and gyroscopes) for final temporal accuracy.
+\end{itemize}
+
+The existing diode-tracking system has several challenges which we
+will account for, and will produce an exciting model:
+
+\begin{itemize}
+\item \textbf{Occlusion} In many frames, it is hard to see both LEDs. They are
+  differentiated by size, and when one is occluded it can be confusing
+  to determine whether you are tracking the large or small one.
+\item \textbf{Complex behavior} The animal will rear in various contexts,
+  which means that the LED's motion is not simply in the $x-y$ plane.
+\item \textbf{Reflection} The LEDs are quite bright relative to the
+  background, and will sometimes reflect off nearby surfaces
+\item \textbf{Correlations} A great deal of short-term occlusion comes from
+  the wire bundle emerging from the head stage. Due to the geometry of
+  the setup, then, occlusion will be strongly correlated with
+  position.
+\item \textbf{Diversity of experimental environment} Rodents are run in many
+  different environments, with different geometries and different
+  occupancy profiles.
+\item \textbf{Long-running} Experiments can be many hours long, and at a
+  framerate of 60 Hz that means over $200k$ points per hour. In
+  these regimes, SMC methods can suffer from pathologies like particle
+  depletion.
+\item \textbf{Complex environmental motion} Often, other things in the scene
+  can be moving, ranging from parts of the experiment (for reward
+  delivery or track reconfiguration) to simply the experimenter.
+\end{itemize}
+
+\section{Methodology}
+Sequential Monte Carlo methods, beginning with the rise of
+Sequential-Importance-Resampling in 1993 \cite{Gordon1993}, have become
+the go-to method for nonlinear time series state estimation
+problems. They have seen a great deal of success in problems around
+tracking and navigation, especially in the areas of simultaneous
+localization and mapping \cite{FastSLAM2002}, where the goal of a robot is
+to explore a novel space while simultaneously building up a map of
+that space.
+
+Recent advances hint at the possibility of these methods becoming
+substantially more powerful for the average experimenter. This
+includes the incorporation of various types of Markov-chain Monte
+Carlo into SMC \cite{Gilks2001} and vice-versa \cite{Andrieu2010b},
+automatic decomposition of state spaces for efficient inference
+\cite{Ahmed2012}, and the development of exact approximations for
+previously-analytic operations like Rao-Blackwellization
+\cite{JohansenExact2012}. Over the course of this project I want to become an
+expert in these contemporary methods, reimplementing many of them from
+recent papers to evaluate their suitability in real-world tracking
+problems.
+
+My other love, nonparametric Bayesian methods, have seen increasing
+use in time series analysis \cite{FoxThesis2009}. While outside of the
+scope of this project, the hope is that the generative state-space
+view encouraged by SMC will serve as a natural bridge to the more
+familiar ground of np-Bayes.
+
+\section{Data}
+
+The input and evaluation data will be existing tracking datasets
+provided by the Frank Lab. These consist of a video of the animal's
+behavior along with the human-annotated tracking data. The more of
+these I can obtain, the better, as they will give a better indication
+of the variety of animal behaviors that can be expected. I will curate
+these data into a collection of training sets for algorithmic
+evaluation.
+
+
+\section{Tools}
+
+I plan to experiment, write, and deliver everything in Python. Python
+is an easy-to-use interpreted programming language that has seen
+widespread adoption by the same scientific community that has
+traditionally relied on MATLAB for experimental data analysis. The
+addition of various excellent libraries (Including numpy \cite{numpy}
+for matrix-vector operations, SciPy \cite{scipy} for scientific
+functions, and Matplotlib \cite{matplotlib} for plotting) have made it
+an excellent matlab replacement. When Python's interpreted speed
+becomes a bottleneck, it is now trivial to implement c-level functions
+using Cython\cite{cython}.
+
+The rise of ubiquitous cloud computing infrastructure has made it
+possible for researchers to easily exploit computing resources across
+thousands of machines. The per-cpu-core-hour pricing model results in
+100 hours of computing time costing several dollars, and the
+parallelization and elasticity afforded allow for those 100 hours to
+be completed in one hour of wall-clock time. I plan on using
+Pi-cloud's excellent services \cite{picloud} to test algorithm changes
+across multiple datasets simultaneously.
+
+\section{Deliverables}
+All source code will be delivered in a git repository served on Github
+\cite{github}, as well as documentation, pseudocode, and results. I
+will write up the results in journal format and would like to
+ultimately submit it to one of the IEEE journals on tracking or
+time-series analytics.
+
+The tracking code program will work similar to the existing program,
+where an input mpeg video along with timing synchronization
+information will yield a file consisting of position data. It's likely
+that the output file will condition additional information not
+provided by the current tracking software, including head direction
+and a confidence bound around the tracking estimate.
+
+
+\section{Conclusion}
+The expected duration of the project is between four and six weeks,
+with weekly meetings at the Frank Lab to review progress. Total
+expenses for computing resources are estimated at less than
+\$1000. Should this project succeed, it will hopefully save
+researchers many hours of hand-labeling video and provide
+higher-quality spatial data for subsequent analysis. The realtime
+potential will hopefully contribute to current experiments at online
+experiment design.
+
+\printbibliography
+
+
+\end{document}
