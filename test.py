@@ -3,6 +3,7 @@ import numpy as np
 from matplotlib import pyplot
 import os
 import glob
+import video
 
 def header_read(f):
     """
@@ -19,31 +20,6 @@ BASEDIR = "/Users/jonas/projects/ssm/franklab/eric/Bukowski/bukowski_02/"
 def b(f):
     return os.path.join(BASEDIR, f)
 
-
-class MPEGWrapper(object):
-    def __init__(self, filename):
-        self.filename = filename
-        self.cap = cv.CaptureFromFile(filename)
-
-        self.frame_count = cv.GetCaptureProperty(self.cap, 
-                                                 cv.CV_CAP_PROP_FRAME_COUNT)
-        
-        self.fps = cv.GetCaptureProperty(self.cap, 
-                                         cv.CV_CAP_PROP_FPS)
-        self.width = cv.GetCaptureProperty(self.cap, cv.CV_CAP_PROP_FRAME_WIDTH)
-        self.height = cv.GetCaptureProperty(self.cap, cv.CV_CAP_PROP_FRAME_HEIGHT)
-        
-    def get_next_frame(self):
-        i = cv.QueryFrame(self.cap)
-        ai =  np.asarray(cv.GetMat(i))
-        return ai
-
-    def seek(self, id):
-        cv.SetCaptureProperty(self.cap, cv.CV_CAP_PROP_POS_FRAMES, id)
-    def get_pos(self):
-        return cv.GetCaptureProperty(self.cap, cv.CV_CAP_PROP_POS_FRAMES)
-
-        
 def read_possynctimes(f):
     """
     Return numpy array with possynctimes
@@ -102,27 +78,32 @@ pts = read_postimestamp(header_read(b(basename + '.postimestamp')))
 start_f = np.searchsorted(pts['timestamp'], start_t)
 end_f = np.searchsorted(pts['timestamp'], end_t)
 
-mpeg_file = MPEGWrapper(b(basename + ".mpeg"))
+mpeg_file = video.MPEGWrapper(b(basename + ".mpeg"))
 
 print "start time = ", start_t
 print "end time = ", end_t
 print "start_f = ", start_f
 print "end_f = ", end_f
 
-mpeg_file.seek(start_f - 10)
+mpeg_file.seek(start_f)
 print "Seek to", start_f, "now at",  mpeg_file.get_pos()
+data = np.zeros((end_f - start_f, 240, 320), dtype=np.uint8)
 
-for i in range(100):
-    pos = epochs[tgt_epoch]['position'][i]
-    print pos['timestamp'], pts['timestamp'][start_f + i]
-
+for i in range(start_f, end_f):
+    print "frame", i, end_f
+    #pos = epochs[tgt_epoch]['position'][i]
+    #print pos['timestamp'], pts['timestamp'][start_f + i]
 
     f = mpeg_file.get_next_frame()
-    pyplot.figure()
-    pyplot.imshow(f)
-    pyplot.scatter(pos[1][0], pos[1][1])
-    pyplot.scatter(pos[2][0], pos[2][1], c='r')
-    pyplot.savefig('test%05d.png' % i)
+    # pyplot.figure()
+    # pyplot.imshow(f)
+    # pyplot.scatter(pos[1][0], pos[1][1])
+    # pyplot.scatter(pos[2][0], pos[2][1], c='r')
+    # pyplot.savefig('test%05d.png' % i)
+    print f.shape
+    
+    data[i - start_f] = f[:, :, 0]
+np.save("video.npy", data)
 
 # I'm pretty sure postimestamp goes from frame# in file ->timestamp
 
