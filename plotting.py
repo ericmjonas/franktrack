@@ -54,9 +54,10 @@ def animate_state(state, length):
 def plot_state_timeseries(state, length):
     
     ax_main = pylab.subplot2grid((8,8), (0, 0), colspan=4, rowspan=4)
+    ax_main.grid(1)
     plot_state(ax_main, state, 10, length)
 
     for si, s in enumerate(['x', 'y', 'phi', 'theta']):
         ax_i = pylab.subplot2grid((8, 8), (4 + si, 0), colspan=8)
         ax_i.plot(state[s])
-    
+        ax_i.grid(1)

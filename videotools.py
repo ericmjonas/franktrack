@@ -339,6 +339,8 @@ def dump_grey_movie(fname, array):
 	"""
 	Convenience function
 	"""
+	if array.dtype != np.uint8:
+		raise Exception("Can't convert movie")
 
 	vsnk = VideoSink(fname, size = array.shape[1:3], 
 			 colorspace = 'y8')
