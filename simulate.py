@@ -49,8 +49,8 @@ def gen_track_circle(t, average_angular_velocity, env,
     
     return state
 
-def render(env, state, DIODE_SEP = 10,
-           FRONT_PIX = 4, BACK_PIX =2):
+def render(env, state, DIODE_SEP = 14,
+           FRONT_PIX = 5, BACK_PIX =3):
 
     gc = env.gc
 

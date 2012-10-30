@@ -19,7 +19,7 @@ y = np.array(y)
 print x.shape
 xbar = np.mean(x, axis=1)
 ybar = np.mean(y, axis=1)
-wvar = np.var(weights, axis=1)
+wvar = 1./np.var(weights, axis=1)
 
 print xbar.shape
 pylab.subplot(3,1, 1)

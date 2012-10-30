@@ -85,9 +85,9 @@ le = likelihood.LikelihoodEvaluator(env, eo)
 model_inst = model.LinearModel(env, le)
 
 PARTICLEN = 1000
-FRAMEN = 20 # len(d['video'])
+FRAMEN = len(d['video'])
 y = d['video'][:FRAMEN]
 
 weights, particles = particle_filter(y, model_inst, FRAMEN, PARTICLEN)
 
-#np.savez_compressed('test.npz', weights=weights, particles=particles)
+np.savez_compressed('test.npz', weights=weights, particles=particles)

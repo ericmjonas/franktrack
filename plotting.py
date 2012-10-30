@@ -61,3 +61,4 @@ def plot_state_timeseries(state, length):
         ax_i = pylab.subplot2grid((8, 8), (4 + si, 0), colspan=8)
         ax_i.plot(state[s])
         ax_i.grid(1)
+
