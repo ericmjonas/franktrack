@@ -21,13 +21,21 @@ class MPEGWrapper(object):
         self.width = cv.GetCaptureProperty(self.cap, cv.CV_CAP_PROP_FRAME_WIDTH)
         self.height = cv.GetCaptureProperty(self.cap, cv.CV_CAP_PROP_FRAME_HEIGHT)
         
+        self.internal_pos = 0
     def get_next_frame(self):
         i = cv.QueryFrame(self.cap)
         ai =  np.asarray(cv.GetMat(i))
+        self.internal_pos += 1
+
         return ai
 
     def seek(self, id):
-        cv.SetCaptureProperty(self.cap, cv.CV_CAP_PROP_POS_FRAMES, id)
+        while self.internal_pos < id:
+            if self.internal_pos % 1000 == 0:
+                print self.internal_pos, id
+            self.get_next_frame()
+
+        #cv.SetCaptureProperty(self.cap, cv.CV_CAP_PROP_POS_FRAMES, id)
     def get_pos(self):
         return cv.GetCaptureProperty(self.cap, cv.CV_CAP_PROP_POS_FRAMES)
 
