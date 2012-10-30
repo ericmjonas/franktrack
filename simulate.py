@@ -49,8 +49,8 @@ def gen_track_circle(t, average_angular_velocity, env,
     
     return state
 
-def render(env, state, DIODE_SEP = 14,
-           FRONT_PIX = 5, BACK_PIX =3):
+def render(env, state, DIODE_SEP = 10,
+           FRONT_PIX = 4, BACK_PIX =2):
 
     gc = env.gc
 
@@ -86,17 +86,19 @@ def add_noise_background(video, dc_noise_level, ac_noise_level):
     
 
 def simple_gen():
-    SIM_DURATION = 10.0
+    SIM_DURATION = 30.0
     TDELTA = 1/30.
     t = np.arange(0, SIM_DURATION, TDELTA)
 
-    env = util.Environment((1.5, 2), (240, 320))
-    
-    state = gen_track_circle(t, np.pi*2/10, env, circle_radius=0.5)
-    images = render(env, state)
-    new_images = add_noise_background(images, 0, 0) # 100, 100)
-    pickle.dump({'state' : state, 
-                 'video' : new_images}, 
-                open('simulate.pickle', 'w'))
-    videotools.dump_grey_movie('test.avi', new_images)    
+    for NOISE in [0, 50, 100, 200, 255]:
+
+        env = util.Environment((1.5, 2), (240, 320))
+
+        state = gen_track_circle(t, np.pi*2/10, env, circle_radius=0.5)
+        images = render(env, state)
+        new_images = add_noise_background(images, NOISE, NOISE)
+        pickle.dump({'state' : state, 
+                     'video' : new_images}, 
+                    open('simulate.%03d.pickle' % NOISE, 'w'))
+        videotools.dump_grey_movie('test.%03d.avi' % NOISE, new_images)    
 simple_gen()

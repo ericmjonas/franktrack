@@ -123,6 +123,8 @@ def alignment_test():
     linear_p = read_pfile(header_read(b(basename + "_linear.p")))
 
     mpeg_file = video.MPEGWrapper(b(basename + ".mpeg"))
+    print "FRAME COUNT=", mpeg_file.frame_count
+
     for F in  [11, 110, 200, 301, 400, 501, 601, 700, 800, 901]:
         start_t = linear_p[F]['timestamp']
         start_f = np.searchsorted(pts['timestamp'], start_t)

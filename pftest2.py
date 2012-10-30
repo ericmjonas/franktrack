@@ -6,6 +6,7 @@ import likelihood
 import util
 import model
 import time
+from matplotlib import pylab
 
 def resample_multinomial(particles, weights):
     """
@@ -56,38 +57,47 @@ def particle_filter(y, model, N, PARTICLE_N = 100):
     weights[0] = normalize(weights[0])
 
     # resample
-    particles[0] = resample_multinomial(particles[0], weights[0])
-    print particles[0]
+    resampled_particles = resample_multinomial(particles[0], weights[0])
     for n in range(1, N):
         t1 = time.time()
-        new_particles = []
+        proposed_particles = []
         for i in range(PARTICLE_N):
-            p = model.sample_next_latent(particles[-1][i], n)
-            new_particles.append(p)
+            p = model.sample_next_latent(resampled_particles[i], n)
+            proposed_particles.append(p)
             weights[n, i] = weight_calc(y[n], p)
         weights[n] = normalize(weights[n])
+        particles.append(proposed_particles)
+        # if n > 10:
+        #     STATEVARS = ['x', 'y', 'xdot', 'ydot', 'phi', 'theta']
+        #     for vi, v in enumerate(STATEVARS):
+        #         pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
+        #         pylab.hist([q[v] for q in proposed_particles], bins=20)
+        #     pylab.show()
 
-        particles.append(resample_multinomial(new_particles, weights[n]))
+        resampled_particles = resample_multinomial(proposed_particles, weights[n])
         t2 = time.time()
         print "n=", n, "%3.1f secs" % (t2-t1), (t2-t1)*(N-n), "remaining"
     return weights, particles
 
-np.random.seed(0)
 
-d = pickle.load(open('simulate.pickle'))
+for i in [0 , 50, 100, 200, 255]:
+    np.random.seed(0)
 
-env = util.Environment((1.5, 2), (240, 320))
+    d = pickle.load(open('simulate.%03d.pickle'  % i))
 
-eo = likelihood.EvaluateObj(240, 320)
-eo.set_params(10, 4, 2)
-le = likelihood.LikelihoodEvaluator(env, eo)
+    env = util.Environment((1.5, 2), (240, 320))
 
-model_inst = model.LinearModel(env, le)
+    eo = likelihood.EvaluateObj(240, 320)
+    eo.set_params(10, 4, 2)
+    le = likelihood.LikelihoodEvaluator(env, eo)
 
-PARTICLEN = 1000
-FRAMEN = len(d['video'])
-y = d['video'][:FRAMEN]
+    model_inst = model.LinearModel(env, le)
 
-weights, particles = particle_filter(y, model_inst, FRAMEN, PARTICLEN)
+    PARTICLEN = 1000
+    FRAMEN = len(d['video'])
+    y = d['video'][:FRAMEN]
 
-np.savez_compressed('test.npz', weights=weights, particles=particles)
+    weights, particles = particle_filter(y, model_inst, FRAMEN, PARTICLEN)
+
+    np.savez_compressed('test.%03d.npz' % i, 
+                        weights=weights, particles=particles)

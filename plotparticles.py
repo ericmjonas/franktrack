@@ -2,32 +2,37 @@ import numpy as np
 import cPickle as pickle
 from matplotlib import pylab
 
-
-a = np.load('test.npz')
+NOISE = 0
+a = np.load('test.%03d.npz' % NOISE)
 
 weights = a['weights']
 particles = a['particles']
 print particles
-x = []
-y = []
+STATEVARS = ['x', 'y', 'xdot', 'ydot', 'phi', 'theta']
+vals = dict([(x, []) for x in STATEVARS])
 for p in particles:
-    x.append([s['x'] for s in p])
-    y.append([s['y'] for s in p])
-x = np.array(x)
-y = np.array(y)
+    for v in STATEVARS:
+        vals[v].append([s[v] for s in p])
+for v in STATEVARS:
+    vals[v] = np.array(vals[v])
 
-print x.shape
-xbar = np.mean(x, axis=1)
-ybar = np.mean(y, axis=1)
-wvar = 1./np.var(weights, axis=1)
+for vi, v in enumerate(STATEVARS):
+    v_bar = np.mean(vals[v], axis=1)
+    pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
+    pylab.plot(v_bar, color='b')
 
-print xbar.shape
-pylab.subplot(3,1, 1)
-pylab.plot(xbar)
-pylab.subplot(3,1, 2)
-pylab.plot(ybar)
-pylab.subplot(3,1, 3)
-pylab.plot(wvar)
+pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
+# now plot the # of particles consuming 95% of the prob mass
+real_particle_num = []
+for w in weights:
+    w = w / np.sum(w) # make sure they're normalized
+    w = np.sort(w)[::-1] # sort, reverse order
+    wcs = np.cumsum(w)
+    wcsi = np.searchsorted(wcs, 0.95)
+    real_particle_num.append(wcsi)
+
+pylab.plot(real_particle_num)
+ 
 pylab.show()
 
 

@@ -29,7 +29,7 @@ class LinearModel(object):
         """
         self.DELTA_T = 1/30. 
         self.VELOCITY_NOISE_STD = 0.03 # 1cm/sec noise
-        self.POS_NOISE_STD = 0.005 # basically all noise comes from motion dynamics
+        self.POS_NOISE_STD = 0.05 # basically all noise comes from motion dynamics
         self.PHI_NOISE_STD = 0.3 # a good chunk of noise; units? 
         self.THETA_NOISE_STD = 0.1 # 
         

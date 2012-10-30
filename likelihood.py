@@ -102,7 +102,7 @@ class LikelihoodEvaluator(object):
         pi_pix = proposed_img*255
 
         delta = (pi_pix - img.astype(np.float32))
-        s = - 8 *  np.log(np.sum(np.abs(delta)))
+        s = - np.sum(np.abs(delta))
         return s
 
         
