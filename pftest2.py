@@ -80,7 +80,7 @@ def particle_filter(y, model, N, PARTICLE_N = 100):
     return weights, particles
 
 
-for i in [0 , 50, 100, 200, 255]:
+for i in [0]: # , 50, 100, 200, 255]:
     np.random.seed(0)
 
     d = pickle.load(open('simulate.%03d.pickle'  % i))
@@ -94,7 +94,7 @@ for i in [0 , 50, 100, 200, 255]:
     model_inst = model.LinearModel(env, le)
 
     PARTICLEN = 1000
-    FRAMEN = len(d['video'])
+    FRAMEN = 30 # len(d['video'])
     y = d['video'][:FRAMEN]
 
     weights, particles = particle_filter(y, model_inst, FRAMEN, PARTICLEN)

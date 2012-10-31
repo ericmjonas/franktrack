@@ -2,8 +2,9 @@ import numpy as np
 import cPickle as pickle
 from matplotlib import pylab
 
-NOISE = 0
+NOISE = 50
 a = np.load('test.%03d.npz' % NOISE)
+truth = pickle.load(open('simulate.%03d.pickle' % NOISE, 'r'))
 
 weights = a['weights']
 particles = a['particles']
@@ -20,7 +21,10 @@ for vi, v in enumerate(STATEVARS):
     v_bar = np.mean(vals[v], axis=1)
     pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
     pylab.plot(v_bar, color='b')
-
+    if 'dot' in v:
+        pylab.plot(np.diff(truth['state'][v[0]]), color='g')
+    else:
+        pylab.plot(truth['state'][v], color='g')
 pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
 # now plot the # of particles consuming 95% of the prob mass
 real_particle_num = []
