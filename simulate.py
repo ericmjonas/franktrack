@@ -15,8 +15,8 @@ c. add noise, distractions, etc. to the images.
 
 
 def gen_track_circle(t, average_angular_velocity, env, 
-                     xy_noise=0.001, phi_noise = 0.02, 
-                     theta_noise=0.1, circle_radius = 1.0):
+                     xy_noise=0.001, phi_noise = 0.002, 
+                     theta_noise=0.01, circle_radius = 1.0):
               
     """
     This has the animal running around in roughly a circle with some 
