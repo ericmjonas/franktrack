@@ -26,21 +26,26 @@ def read_possynctimes(f):
     Return numpy array with possynctimes
     """
 
-    d = np.fromfile(f, dtype=[("timestamp", np.uint32), ("transition", np.uint8)])
+    d = np.fromfile(header_read(f), 
+                    dtype=[("timestamp", np.uint32),
+                           ("transition", np.uint8)])
     
     return d
+
 def read_pfile(f):
     """
     Read a position file
     """
-    d = np.fromfile(f, dtype=[("timestamp", np.uint32), 
-                              ("front", np.uint16, 2), 
-                              ("back", np.uint16, 2)])
+    d = np.fromfile(header_read(f), 
+                    dtype=[("timestamp", np.uint32), 
+                           ("front", np.uint16, 2), 
+                           ("back", np.uint16, 2)])
 
     return d
 
 def read_postimestamp(f):
-    d = np.fromfile(f, dtype=[('timestamp', np.uint32)])
+    d = np.fromfile(header_read(f),
+                    dtype=[('timestamp', np.uint32)])
     return d
 
 def read_mpegoffset(f):
@@ -151,4 +156,3 @@ def alignment_test():
         pylab.savefig('test%05d.png' % F, dpi=300)
         # print mpeg_file.frame_count
 
-alignment_test()
