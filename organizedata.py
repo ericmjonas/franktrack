@@ -15,11 +15,13 @@ positions.npy : front/back diode positions for each frame, npy
 frames : a collection of 1000 frame chunks with the start frame #
 """
 
-DATA_DIR = "test"
+DATA_DIR = "data/fl"
 
 VIDEOTEMP = "video.temp" # place for rendered frames
 
 FRAMES_PER_TAR = 1000
+FIGS_DIR = "figs"
+
 
 # this code goes through and generates the files necessary for processing the data
 
@@ -135,7 +137,7 @@ def pfile_to_pos_file(pfile_array, cam_dim, area_dim):
         fl_x, fl_y = row['front']
         bl_x, bl_y = row['back']
         if fl_x == 0 or bl_x == 0 or fl_y == 0 or bl_y == 0:
-            d.mask[ri] = np.ma.masked
+            d[ri] = np.ma.masked
         else:
             fl_pos = (float(fl_x)/CAM_MAX_X * AREA_MAX_X, 
                       float(fl_y)/CAM_MAX_Y * AREA_MAX_Y) 
@@ -150,7 +152,7 @@ def pfile_to_pos_file(pfile_array, cam_dim, area_dim):
     return d
             
     
-@follows(mpeg_to_stills)
+@follows(mpeg_to_stills, mkdir(DATA_DIR))
 @files(package_fl_proc)
 def package_fl_frames((postimestamp, videodir, epoch), 
                       (positions_file, frames_tar_dir, config_pickle), 
@@ -196,6 +198,7 @@ def package_fl_frames((postimestamp, videodir, epoch),
     config.update(params)
     pickle.dump(config, file(config_pickle, 'w'))
     
-    
-pipeline_run([package_fl_frames]) # , multiprocess=3)
 
+if __name__ == "__main__":    
+    pipeline_run([package_fl_frames], multiprocess=3)
+    

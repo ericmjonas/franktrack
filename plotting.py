@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pylab
 import time
-import util
+import util2 as util
 
 def plot_state(ax, state, full_render_skip, 
                length):

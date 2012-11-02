@@ -2,7 +2,7 @@ import numpy as np
 import cPickle as pickle
 from matplotlib import pylab
 
-NOISE = 0
+NOISE = 200
 T_DELTA = 1/30.
 a = np.load('test.%03d.npz' % NOISE)
 truth = pickle.load(open('simulate.%03d.pickle' % NOISE, 'r'))

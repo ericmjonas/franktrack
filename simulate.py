@@ -1,7 +1,7 @@
 import numpy as np
 import likelihood
 import cPickle as pickle
-import util
+import util2 as util
 import plotting
 from matplotlib import pyplot
 import videotools
@@ -88,23 +88,3 @@ def add_noise_background(video, dc_noise_level,
         new_f = np.minimum(new_f, 255)
         new_video[f] = new_f
     return new_video
-
-def simple_gen():
-    SIM_DURATION = 30.0
-    TDELTA = 1/30.
-    t = np.arange(0, SIM_DURATION, TDELTA)
-
-    frames_to_skip = [20, 35, 36, 50, 51, 52, 53]
-    for NOISE in [0, 50, 100, 200, 255]:
-
-        env = util.Environment((1.5, 2), (240, 320))
-
-        state = gen_track_circle(t, np.pi*2/10, env, circle_radius=0.5)
-        images = render(env, state)
-        new_images = add_noise_background(images, NOISE, NOISE, 
-                                          frames_to_skip)
-        pickle.dump({'state' : state, 
-                     'video' : new_images}, 
-                    open('simulate.%03d.pickle' % NOISE, 'w'))
-        videotools.dump_grey_movie('test.%03d.avi' % NOISE, new_images)    
-simple_gen()

@@ -29,7 +29,7 @@ class LinearModel(object):
         """
         self.DELTA_T = 1/30. 
         self.VELOCITY_NOISE_STD = 0.1 #
-        self.POS_NOISE_STD = 0.005 # 
+        self.POS_NOISE_STD = 0.01 # 
         self.PHI_NOISE_STD = 0.2 # a good chunk of noise; units? 
         self.THETA_NOISE_STD = 0.1 # 
         

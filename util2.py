@@ -18,7 +18,7 @@ DTYPE_STATE = [('x', np.float32),
                ('theta', np.float32)]
 
 
-class Environment(object):
+class Environmentz(object):
     """ 
     By default, an environment's origin is in the lower-left corner
     """

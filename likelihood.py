@@ -6,7 +6,7 @@ import scipy.ndimage
 
 # import cutil
 from matplotlib import pylab
-import util
+import util2 as util
 
 def pos_to_int(p):
     return np.rint(p).astype(int)

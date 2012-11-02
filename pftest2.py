@@ -3,10 +3,11 @@ import scipy.stats
 import cPickle as pickle
 from matplotlib import pyplot
 import likelihood
-import util
+import util2 as util
 import model
 import time
 from matplotlib import pylab
+import cloud
 
 def resample_multinomial(particles, weights):
     """
@@ -80,12 +81,12 @@ def particle_filter(y, model, N, PARTICLE_N = 100):
     return weights, particles
 
 
-for i in [0]:
+for i in [200]:
     np.random.seed(0)
 
     d = pickle.load(open('simulate.%03d.pickle'  % i))
 
-    env = util.Environment((1.5, 2), (240, 320))
+    env = util.Environmentz((1.5, 2), (240, 320))
 
     eo = likelihood.EvaluateObj(240, 320)
     eo.set_params(10, 4, 2)
@@ -94,10 +95,20 @@ for i in [0]:
     model_inst = model.LinearModel(env, le)
 
     PARTICLEN = 10000
-    FRAMEN = 60 # len(d['video'])
+    FRAMEN = 3 # len(d['video'])
     y = d['video'][:FRAMEN]
+    t1 = time.time()
+    CLOUD = True
+    if CLOUD:
+        jid = cloud.call(particle_filter, y[:FRAMEN], model_inst, FRAMEN, 
+                         PARTICLEN, _type='f2')
+        cloud.join(jid)
+        weights, particles = cloud.result(jid)
 
-    weights, particles = particle_filter(y, model_inst, FRAMEN, PARTICLEN)
+    else:
+        weights, particles = particle_filter(y, model_inst, FRAMEN, PARTICLEN)
 
+    t2 = time.time()
+    print "WOW, that took", t2-t1, "sec"
     np.savez_compressed('test.%03d.npz' % i, 
                         weights=weights, particles=particles)
