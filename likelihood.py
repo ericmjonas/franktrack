@@ -1,10 +1,59 @@
 import numpy as np
 import scipy.ndimage
+# import pyximport;
+
+# pyximport.install(setup_args={'include_dirs': np.get_include()})
+
+# import cutil
 from matplotlib import pylab
 import util
 
 def pos_to_int(p):
     return np.rint(p).astype(int)
+
+
+class RenderRegion(object):
+    def __init__(self, MAXX = None, MAXY=None):
+        self.xregion = (0, 0)
+        self.yregion = (0, 0)
+        self.MAXX = MAXX
+        self.MAXY = MAXY
+
+    def add_x(self, xmin, xmax):
+        self.xregion = self.add(self.xregion, xmin, xmax)
+
+    def add_y(self, ymin, ymax):
+        self.yregion = self.add(self.yregion, ymin, ymax)
+
+    def get_x_bounded(self):
+        return self.get_bounded(self.xregion, self.MAXX)
+
+    def get_y_bounded(self):
+        return self.get_bounded(self.yregion, self.MAXY)
+
+    def get_bounded(self, region, maxv):
+        if region == None:
+            return None
+        lower = np.max([region[0], 0])
+        if maxv == None:
+            upper = region[1]
+        else:
+            upper = np.min([region[1], maxv])
+        return lower, upper
+
+    def add(self, region, xmin, xmax):
+        if xmin == xmax:
+            return region
+        if region[0] == region[1]:
+            return (xmin, xmax)
+
+        if xmax-xmin > 0:
+            min_val = np.min([region[0], xmin, xmax])
+            max_val = np.max([region[1], xmin, xmax])
+            return (min_val, max_val)
+        return region
+
+    
 
 class EvaluateObj(object):
     """
@@ -36,6 +85,7 @@ class EvaluateObj(object):
                                                        self.front_size)
         self.pre_img[1] = scipy.ndimage.filters.gaussian_filter(self.pre_img[1], 
                                                        self.back_size)
+
     def render_source(self, x, y, phi, theta):
         """
         Returns an image where max intensity is 
@@ -89,6 +139,9 @@ class LikelihoodEvaluator(object):
         self.evaluate_obj = evaluate_obj
 
     def score_state(self, state, img):
+        return self.score_state_full(state, img)
+
+    def score_state_full(self, state, img):
         x = state['x']
         y = state['y']
 
@@ -105,6 +158,32 @@ class LikelihoodEvaluator(object):
         s = - np.sum(np.abs(delta))
         return s
 
+
+    def score_state_subregion(self, state, img):
+        """
+        only score the most interesting area
+        """
+        x = state['x']
+        y = state['y']
+
+
+        theta = state['theta']
+        phi = state['phi']
+        x_pix, y_pix = self.env.gc.real_to_image(x, y)
+
+        proposed_img, rr = self.evaluate_obj.render_source(x_pix, y_pix,
+                                                           phi, theta)
+        rr_x = rr.get_x_bounded()
+        rr_y = rr.get_y_bounded()
+        proposed_img = proposed_img[rr_y[0]:rr_y[1], 
+                                    rr_x[0]:rr_x[1]]
+
+        pi_pix = proposed_img*255
+        img = img[rr_y[0]:rr_y[1], 
+                  rr_x[0]:rr_x[1]]
+        delta = (pi_pix - img.astype(np.float32))
+        s = - np.sum(np.abs(delta))
+        return s
         
 if __name__ == "__main__":
     eo = EvaluateObj(320, 240)

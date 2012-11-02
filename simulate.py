@@ -71,7 +71,8 @@ def render(env, state, DIODE_SEP = 10,
     return images
 
 
-def add_noise_background(video, dc_noise_level, ac_noise_level):
+def add_noise_background(video, dc_noise_level, 
+                         ac_noise_level, frames_to_skip = None):
     N, VIDEO_ROWS, VIDEO_COLS = video.shape
     dc_noise = (np.random.rand(VIDEO_ROWS, VIDEO_COLS) * dc_noise_level)
 
@@ -79,24 +80,29 @@ def add_noise_background(video, dc_noise_level, ac_noise_level):
 
     for f in range(len(video)):
         ac_noise = np.random.rand(VIDEO_ROWS, VIDEO_COLS)*ac_noise_level
-        new_f = video[f].astype(np.float32) + dc_noise + ac_noise
+        if frames_to_skip != None and f in frames_to_skip:
+            print "skipping frame", f
+            new_f = dc_noise + ac_noise
+        else:
+            new_f = video[f].astype(np.float32) + dc_noise + ac_noise
         new_f = np.minimum(new_f, 255)
         new_video[f] = new_f
     return new_video
-    
 
 def simple_gen():
     SIM_DURATION = 30.0
     TDELTA = 1/30.
     t = np.arange(0, SIM_DURATION, TDELTA)
 
+    frames_to_skip = [20, 35, 36, 50, 51, 52, 53]
     for NOISE in [0, 50, 100, 200, 255]:
 
         env = util.Environment((1.5, 2), (240, 320))
 
         state = gen_track_circle(t, np.pi*2/10, env, circle_radius=0.5)
         images = render(env, state)
-        new_images = add_noise_background(images, NOISE, NOISE)
+        new_images = add_noise_background(images, NOISE, NOISE, 
+                                          frames_to_skip)
         pickle.dump({'state' : state, 
                      'video' : new_images}, 
                     open('simulate.%03d.pickle' % NOISE, 'w'))

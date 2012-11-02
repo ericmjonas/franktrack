@@ -2,7 +2,7 @@ import numpy as np
 import cPickle as pickle
 from matplotlib import pylab
 
-NOISE = 255
+NOISE = 0
 T_DELTA = 1/30.
 a = np.load('test.%03d.npz' % NOISE)
 truth = pickle.load(open('simulate.%03d.pickle' % NOISE, 'r'))
@@ -21,8 +21,14 @@ for v in STATEVARS:
 
 for vi, v in enumerate(STATEVARS):
     v_bar = np.mean(vals[v], axis=1)
+    x = np.arange(0, len(v_bar))
+
+    v_std = np.std(vals[v], axis=1)
     pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
-    pylab.plot(v_bar, color='b')
+    pylab.plot(x, v_bar, color='b')
+    pylab.fill_between(x, v_bar - v_std, 
+                       v_bar + v_std, facecolor='b', 
+                       alpha=0.4)
     if 'dot' in v:
         pylab.plot(np.diff(truth_state[v[0]])/T_DELTA, color='g')
     else:

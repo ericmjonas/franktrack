@@ -26,4 +26,36 @@ def test_render_at_all():
     i1 = eo.render_source(100, 100, 0, np.pi/2)
     pylab.imshow(i1, interpolation='nearest', origin='lower', 
                  vmin=0, vmax=1.0, cmap=pylab.cm.gray)
-    pylab.show()
+    #pylab.show()
+
+def test_interval():
+    rr = likelihood.RenderRegion(100, 200)
+    rr.add_x(0, 0)
+    rr.add_y(0, 0)
+    
+    assert_equal(rr.get_x_bounded(), (0, 0))
+    assert_equal(rr.get_y_bounded(), (0, 0))
+
+    rr.add_x(4, 10)
+    rr.add_y(8, 12)
+    
+    assert_equal(rr.get_x_bounded(), (4, 10))
+    assert_equal(rr.get_y_bounded(), (8, 12))
+
+    rr.add_x(10, 14)
+    rr.add_y(12, 18)
+    
+    assert_equal(rr.get_x_bounded(), (4, 14))
+    assert_equal(rr.get_y_bounded(), (8, 18))
+
+    rr.add_x(-7, 14)
+    rr.add_y(-5, 18)
+    
+    assert_equal(rr.get_x_bounded(), (0, 14))
+    assert_equal(rr.get_y_bounded(), (0, 18))
+
+    rr.add_x(-7, 150)
+    rr.add_y(-5, 250)
+    
+    assert_equal(rr.get_x_bounded(), (0, 100))
+    assert_equal(rr.get_y_bounded(), (0, 200))
