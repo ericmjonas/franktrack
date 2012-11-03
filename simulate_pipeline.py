@@ -12,7 +12,7 @@ SYNTH_DIR = os.path.join(DATA_DIR, SYNTH_NAME)
 
 def synth_circle_noise_gen():
     for NOISE in [0, 100, 255]:
-        base = os.path.join(SYNTH_DIR, "circle.%03d.pickle" % NOISE)
+        base = os.path.join(SYNTH_DIR, "circle.%03d" % NOISE)
         yield [], [base + '.pickle', base +".avi"], NOISE
 
 @follows(mkdir(SYNTH_DIR))

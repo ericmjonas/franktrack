@@ -131,3 +131,18 @@ def log_multinorm_dens(x, mu, cov):
     c = -0.5 * np.dot(np.dot(delta.T, inv_cov), delta)
 
     return a + b + c
+
+def credible_interval(samples, weights, 
+                      lower=0.05, upper=0.95):
+    """
+    samples is  a vector of real-valued samples, weights
+    are a weight associated with each sample
+
+    """
+    s_i = np.argsort(samples)
+    s_sorted = samples[s_i]
+    w_sorted = weights[s_i]
+    cs = np.cumsum(w_sorted)
+    creds = np.searchsorted(cs, [lower, upper])
+    return np.array(s_sorted[creds])
+    

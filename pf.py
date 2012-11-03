@@ -79,36 +79,3 @@ def particle_filter(y, model, N, PARTICLE_N = 100):
         t2 = time.time()
         print "n=", n, "%3.1f secs" % (t2-t1), (t2-t1)*(N-n), "remaining"
     return weights, particles
-
-
-for i in [200]:
-    np.random.seed(0)
-
-    d = pickle.load(open('simulate.%03d.pickle'  % i))
-
-    env = util.Environmentz((1.5, 2), (240, 320))
-
-    eo = likelihood.EvaluateObj(240, 320)
-    eo.set_params(10, 4, 2)
-    le = likelihood.LikelihoodEvaluator(env, eo)
-
-    model_inst = model.LinearModel(env, le)
-
-    PARTICLEN = 10000
-    FRAMEN = 3 # len(d['video'])
-    y = d['video'][:FRAMEN]
-    t1 = time.time()
-    CLOUD = True
-    if CLOUD:
-        jid = cloud.call(particle_filter, y[:FRAMEN], model_inst, FRAMEN, 
-                         PARTICLEN, _type='f2')
-        cloud.join(jid)
-        weights, particles = cloud.result(jid)
-
-    else:
-        weights, particles = particle_filter(y, model_inst, FRAMEN, PARTICLEN)
-
-    t2 = time.time()
-    print "WOW, that took", t2-t1, "sec"
-    np.savez_compressed('test.%03d.npz' % i, 
-                        weights=weights, particles=particles)

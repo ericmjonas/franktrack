@@ -20,7 +20,6 @@ def plot_state(ax, state, full_render_skip,
         fp_y = front_pos[1][p]
         bp_x = back_pos[0][p]
         bp_y = back_pos[1][p]
-        print bp_x, bp_y, fp_x, fp_y
 
         ax.plot([bp_x, fp_x], 
                 [bp_y, fp_y], c='k')
