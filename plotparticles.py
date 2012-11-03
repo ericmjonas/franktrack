@@ -24,6 +24,10 @@ def plot_particles(PARTICLE_FILENAME, TRUTH_FILENAME, OUT_FILENAME):
     for vi, v in enumerate(STATEVARS):
 
 
+        if 'dot' in v:
+            v_truth = np.diff(truth_state[v[0]])/T_DELTA
+        else:
+            v_truth = truth_state[v]
 
         v_bar = np.average(vals[v], axis=1, weights=weights)
         x = np.arange(0, len(v_bar))
@@ -31,20 +35,15 @@ def plot_particles(PARTICLE_FILENAME, TRUTH_FILENAME, OUT_FILENAME):
         for ci, (p, w) in enumerate(zip(vals[v], weights)):
             cred[ci] = util.credible_interval(p, w)
 
-        v_std = np.std(vals[v], axis=1)
         pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
+        pylab.plot(v_truth, color='g', linestyle='-', 
+                   linewidth=1)
+
         pylab.plot(x, v_bar, color='b')
         pylab.fill_between(x, cred[:, 0],
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
 
-        if 'dot' in v:
-            v_truth = np.diff(truth_state[v[0]])/T_DELTA
-        else:
-            v_truth = truth_state[v]
-
-        pylab.plot(v_truth, color='g', linestyle='--', 
-                   linewidth=1)
 
         pylab.ylim([np.min(v_truth), 
                     np.max(v_truth)])

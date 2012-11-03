@@ -134,9 +134,11 @@ class EvaluateObj(object):
 
 
 class LikelihoodEvaluator(object):
-    def __init__(self, env, evaluate_obj):
+    def __init__(self, env, evaluate_obj, log=False):
         self.env = env
         self.evaluate_obj = evaluate_obj
+        self.log = log
+        
 
     def score_state(self, state, img):
         return self.score_state_full(state, img)
@@ -155,7 +157,11 @@ class LikelihoodEvaluator(object):
         pi_pix = proposed_img*255
 
         delta = (pi_pix - img.astype(np.float32))
-        s = - np.sum(np.abs(delta))
+        if self.log:
+            s = - np.sum((delta)**2)
+        else:
+            s = - np.sum(np.abs(delta))
+
         return s
 
 

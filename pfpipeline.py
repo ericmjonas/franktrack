@@ -14,21 +14,22 @@ from ruffus import *
 import pf
 
 def params():
-    PARTICLEN = 10000
-    FRAMEN = 200
+    PARTICLEN = 1000
+    FRAMEN = 10000
     NOISE = 100
-    for posnoise in [0.001, 0.005, 0.01]:
-        for velnoise in [0.01, 0.5, 0.1]:
-            infile = 'data/synth/circle.%03d.pickle'  % NOISE
-            outfile = 'particles.%f.%f.%d.%d.%d.npz' % (posnoise, velnoise, 
-                                                        PARTICLEN, FRAMEN, NOISE)
-            
-            yield (infile, outfile, posnoise, velnoise, PARTICLEN, FRAMEN, 
-                   NOISE)
+    for posnoise in [0.005]:
+        for velnoise in [0.05]:
+            for log in [True, False]:
+                infile = 'data/synth/circle.%03d.pickle'  % NOISE
+                outfile = 'particles.%f.%f.%d.%d.%d.%d.npz' % (posnoise, velnoise, 
+                                                            PARTICLEN, FRAMEN, NOISE, log)
+                
+                yield (infile, outfile, posnoise, velnoise, PARTICLEN, FRAMEN, 
+                   NOISE, log)
 
 @files(params)
 def pf_run(infile, outfile, posnoise, velnoise, PARTICLEN, 
-                    FRAMEN, NOISE):
+                    FRAMEN, NOISE, log):
     np.random.seed(0)
     print "Loading data..."
     d = pickle.load(open(infile))
@@ -37,16 +38,16 @@ def pf_run(infile, outfile, posnoise, velnoise, PARTICLEN,
 
     eo = likelihood.EvaluateObj(240, 320)
     eo.set_params(10, 4, 2)
-    le = likelihood.LikelihoodEvaluator(env, eo)
+    le = likelihood.LikelihoodEvaluator(env, eo, log)
 
     model_inst = model.LinearModel(env, le, 
                                    POS_NOISE_STD=posnoise,
                                    VELOCITY_NOISE_STD=velnoise)
 
     y = d['video'][:FRAMEN]
-    
+
     weights, particles = pf.particle_filter(y, model_inst, 
-                                            FRAMEN, PARTICLEN)
+                                            len(y), PARTICLEN)
     np.savez_compressed(outfile, 
                         weights=weights, particles=particles)
 
