@@ -173,6 +173,7 @@ def package_frames(framedir, start_f, end_f, outdir):
         tgt_f = os.path.join(framedir, "%08d.jpg" % frame_no)
         fid.add(tgt_f, arcname= "%08d.jpg" % frame_no)
         framepos += 1
+    fid.close()
     return archive_filenames
             
 def pfile_to_pos_file(pfile_array, cam_dim, area_dim):
