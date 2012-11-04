@@ -104,16 +104,23 @@ def get_frames(directory, frames):
     frame_archive_src = np.searchsorted(frame_tar_starts, 
                                          frames_sorted + start_f, 
                                         side='right')-1
+    # add in some caching
+    tf = None
+    tf_cached_name = None
+
     for fi, f in enumerate(frames_sorted):
         frame_archive_idx = frame_archive_src[fi]
         frame_archive_frame_no = frame_tar_starts[frame_archive_idx]
 
         # open the frame tarball
-        tf = tarfile.open(os.path.join(directory, 
-                                       "%08d.tar.gz" % frame_archive_frame_no),
-                          "r:gz")
+        tf_name = os.path.join(directory, 
+                               "%08d.tar.gz" % frame_archive_frame_no)
+        if tf_cached_name != tf_name:
+            tf = tarfile.open(tf_name, "r:gz")
+            tf_cached_name = tf_name
+
         frame_no = frames_sorted[fi] + start_f
-        print "frame_no:", frame_no, frame_archive_idx, frame_archive_frame_no, frame_tar_starts[frame_archive_idx+1]
+
         frame = tf.extractfile("%08d.jpg" % frame_no)
         # temporary write to disk
         tempf = tempfile.NamedTemporaryFile()
@@ -121,7 +128,7 @@ def get_frames(directory, frames):
         tempf.flush()
         f = scipy.ndimage.imread(tempf.name, flatten=True)
         out_data[sorted_idx[fi]] = f
-    
+        tempf.close()
     return out_data
 
 
