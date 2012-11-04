@@ -6,6 +6,9 @@ import subprocess
 import frankdata as fl
 import tarfile
 import cPickle as pickle
+import tempfile
+
+import scipy.ndimage
 
 """
 animal_day_epoch_etc/:
@@ -68,7 +71,62 @@ def package_fl_proc():
             yield infiles, outfiles, name, epoch_name, params
                                   
                         
-                                  
+def get_frames(directory, frames):
+    """
+    Convenience function that reads in the config, 
+    figures out the frame pos, and returns the N frames in 
+    a numpy array
+    frames is an array of absolute frame positions
+    
+    """
+
+    cf = pickle.load(open(os.path.join(directory, "config.pickle")))
+    start_f = cf['start_f']
+    end_f = cf['end_f']
+    FRAMEN = end_f - start_f + 1
+
+    if (frames > (FRAMEN-1)).any():
+        raise Exception("Requesting frame not in epoch, there are only %d frames here" % FRAMEN)
+    
+    sorted_idx = np.argsort(frames)
+    frames_sorted = frames[sorted_idx]
+    
+    out_data = np.zeros((len(frames), cf['frame_dim_pix'][0], 
+                         cf['frame_dim_pix'][1]), dtype=np.uint8)
+    
+
+    frame_tars = glob.glob(os.path.join(directory, "*.tar.gz"))
+    frame_tars_filenames = [os.path.basename(f) for f in frame_tars]
+
+    frame_tar_starts = np.sort([int(f[:-len(".tar.gz")]) for f in frame_tars_filenames])
+    assert(frame_tar_starts[0] == start_f)
+
+    frame_archive_src = np.searchsorted(frame_tar_starts, 
+                                         frames_sorted + start_f, 
+                                        side='right')-1
+    for fi, f in enumerate(frames_sorted):
+        frame_archive_idx = frame_archive_src[fi]
+        frame_archive_frame_no = frame_tar_starts[frame_archive_idx]
+
+        # open the frame tarball
+        tf = tarfile.open(os.path.join(directory, 
+                                       "%08d.tar.gz" % frame_archive_frame_no),
+                          "r:gz")
+        frame_no = frames_sorted[fi] + start_f
+        print "frame_no:", frame_no, frame_archive_idx, frame_archive_frame_no, frame_tar_starts[frame_archive_idx+1]
+        frame = tf.extractfile("%08d.jpg" % frame_no)
+        # temporary write to disk
+        tempf = tempfile.NamedTemporaryFile()
+        tempf.write(frame.read())
+        tempf.flush()
+        f = scipy.ndimage.imread(tempf.name, flatten=True)
+        out_data[sorted_idx[fi]] = f
+    
+    return out_data
+
+
+    
+    
 @files(generate_files_fl_proc)
 def mpeg_to_stills(infiles, outfiles, name):
     """

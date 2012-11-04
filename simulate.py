@@ -23,7 +23,7 @@ def gen_track_circle(t, average_angular_velocity, env,
     head-direction wiggle, generally looking straight-ahead, and
     occasionally bobbing. 
 
-    The animal starts at outer-circle-theta=0 moving ccw with head level
+    The animal starts at outer-circle-phi=0 moving ccw with head level
         
     t = temporal moments
     """
@@ -32,7 +32,7 @@ def gen_track_circle(t, average_angular_velocity, env,
 
     R = circle_radius
     
-    theta = t * average_angular_velocity
+    phi = t * average_angular_velocity
 
     x_noise = np.random.normal(0, xy_noise, N)
     y_noise = np.random.normal(0, xy_noise, N)
@@ -42,9 +42,9 @@ def gen_track_circle(t, average_angular_velocity, env,
 
     room_center_xy = env.get_room_center_real_xy()
 
-    state['x'] = R * np.cos(theta) + x_noise + room_center_xy[0]
-    state['y'] = R * np.sin(theta) + y_noise + room_center_xy[1]
-    state['phi'] = np.pi/2 + theta + phi_noise
+    state['x'] = R * np.cos(phi) + x_noise + room_center_xy[0]
+    state['y'] = R * np.sin(phi) + y_noise + room_center_xy[1]
+    state['phi'] = np.pi/2 + phi + phi_noise
     state['theta'] = np.pi/2 + theta_noise 
     
     return state

@@ -14,11 +14,11 @@ from ruffus import *
 import pf
 
 def params():
-    PARTICLEN = 1000
+    PARTICLEN = 2000
     FRAMEN = 10000
-    NOISE = 100
+    NOISE = 255
     for posnoise in [0.005]:
-        for velnoise in [0.05]:
+        for velnoise in [0.05, 0.08]:
             for log in [True, False]:
                 infile = 'data/synth/circle.%03d.pickle'  % NOISE
                 outfile = 'particles.%f.%f.%d.%d.%d.%d.npz' % (posnoise, velnoise, 

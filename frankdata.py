@@ -38,8 +38,8 @@ def read_pfile(f):
     """
     d = np.fromfile(header_read(f), 
                     dtype=[("timestamp", np.uint32), 
-                           ("front", np.uint16, 2), 
-                           ("back", np.uint16, 2)])
+                           ("front", np.int16, 2), 
+                           ("back", np.int16, 2)])
 
     return d
 
