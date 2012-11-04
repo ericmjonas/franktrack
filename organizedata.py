@@ -263,8 +263,39 @@ def package_fl_frames((postimestamp, videodir, epoch),
 
     config.update(params)
     pickle.dump(config, file(config_pickle, 'w'))
-    
 
+@transform(package_fl_frames, suffix("positions.npy"), "frameagg.npz")
+def compute_background(infiles, outfile):
+    position_file = infiles[0]
+    basedir = infiles[1]
+    cf = pickle.load(open(infiles[2]))
+    
+    start_f = cf['start_f']
+    end_f = cf['end_f']
+    frame_shape = cf['frame_dim_pix']
+    FRAMEN = end_f - start_f + 1
+    allframes = np.arange(FRAMEN)
+    def chunker(seq, size):
+        return (seq[pos:pos + size] for pos in xrange(0, len(seq), size))
+
+    # incremental variance calculation
+    n = 0
+    mean = np.zeros(frame_shape, dtype=np.float32)
+    M2 = np.zeros(frame_shape, dtype=np.float32)
+
+    for fis in chunker(allframes, 1000):
+        fs = get_frames(basedir, fis)
+        for x in fs:
+
+            n = n + 1
+            delta = x - mean
+            mean +=  delta/n
+            M2 += delta*(x - mean)
+
+    variance = M2/(n - 1)
+
+    np.savez_compressed(outfile, mean=mean, variance=variance)
+    
 if __name__ == "__main__":    
-    pipeline_run([package_fl_frames], multiprocess=3)
+    pipeline_run([package_fl_frames, compute_background], multiprocess=3)
     
