@@ -7,6 +7,7 @@ import frankdata as fl
 import tarfile
 import cPickle as pickle
 import tempfile
+from matplotlib import pylab
 
 import scipy.ndimage
 
