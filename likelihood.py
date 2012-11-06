@@ -157,11 +157,8 @@ class LikelihoodEvaluator(object):
         pi_pix = proposed_img*255
 
         delta = (pi_pix - img.astype(np.float32))
-        if self.log:
-            s = - np.sum((delta)**2)
-        else:
-            s = - np.sum(np.abs(delta))
-
+        s = - np.sum((delta)**2)
+        
         return s
 
 
@@ -189,6 +186,41 @@ class LikelihoodEvaluator(object):
                   rr_x[0]:rr_x[1]]
         delta = (pi_pix - img.astype(np.float32))
         s = - np.sum(np.abs(delta))
+        return s
+
+class DiodeGeom(object):
+    def __init__(self, length, front_radius, back_radius):
+        self.length = length
+        self.fr = front_radius 
+        self.br = back_radius
+
+class LikelihoodEvaluator2(object):
+    """
+    Try this again, with a faster, more specific kernel
+    """
+    
+    def __init__(self, env, diodegeom):
+        self.env = env
+        self.diodegeom = diodegeom
+
+    def score_state(self, state, img):
+        x = state['x']
+        y = state['y']
+        theta = state['theta']
+        phi = state['phi']
+
+        x_pix, y_pix = self.env.gc.real_to_image(x, y)
+        front_pos, back_pos = util.compute_pos(self.diodegeom.length,
+                                               x, y, phi, theta)
+        
+        
+        # proposed_img = self.evaluate_obj.render_source(x_pix, y_pix,
+        #                                                phi, theta)
+        # pi_pix = proposed_img*255
+
+        # delta = (pi_pix - img.astype(np.float32))
+        # s = - np.sum((delta)**2)
+        
         return s
         
 if __name__ == "__main__":

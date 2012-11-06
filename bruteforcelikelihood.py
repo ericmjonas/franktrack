@@ -4,6 +4,7 @@ Code to brute-force compare the likelihood model
 
 import numpy as np
 import scipy.stats
+import scipy.ndimage
 import cPickle as pickle
 from matplotlib import pyplot
 import likelihood
@@ -16,14 +17,16 @@ import plotparticles
 import os
 import organizedata
 import videotools
+import glob
 
 from ruffus import * 
 import pf
 
 FL_DATA = "data/fl"
 def params():
-    EPOCHS = ['bukowski_04.W1']
-    FRAMES = [0, 100, 200, 300]
+    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
+              'bukowski_04.C', 'bukowski_04.linear']
+    FRAMES = np.arange(100)*50
     
     for epoch in EPOCHS:
         for frame in FRAMES:
@@ -32,10 +35,26 @@ def params():
                       os.path.join(FL_DATA, epoch, 'frameagg.npz'), 
                       ]
 
-            outfile = '%s.likelihoodscores.%d.npz' % (epoch, frame)
+            outfile = '%s.likelihoodscores.%05d.npz' % (epoch, frame)
             
             yield (infile, outfile, epoch, frame)
            
+def frame_params():
+    EPOCHS = [os.path.split(f)[1] for f in glob.glob(FL_DATA + "/*")]
+    FRAMES = np.arange(100)*50
+    
+    for epoch in EPOCHS:
+        for frame_pos in FRAMES:
+            for f in range(3):
+                frame = frame_pos + f
+                infile = [os.path.join(FL_DATA, epoch), 
+                          os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                          os.path.join(FL_DATA, epoch, 'frameagg.npz'), 
+                          ]
+
+                outfile = '%s.likelihoodscores.%05d.pdf' % (epoch, frame)
+
+                yield (infile, outfile, epoch, frame)
 
 @files(params)
 def score_frame((epoch_dir, epoch_config_filename, 
@@ -57,9 +76,9 @@ def score_frame((epoch_dir, epoch_config_filename,
     frames = organizedata.get_frames(epoch_dir, np.array([frame]))
 
     # create the state vector
-    x_range = np.linspace(0, cf['field_dim_m'][1], 100)
-    y_range = np.linspace(0, cf['field_dim_m'][0], 100)
-    phi_range = np.linspace(0, 2*np.pi, 16)
+    x_range = np.linspace(0, cf['field_dim_m'][1], 1)
+    y_range = np.linspace(0, cf['field_dim_m'][0], 1)
+    phi_range = np.linspace(0, 2*np.pi, 1)
     theta_range = np.array([np.pi/2.])
 
     state = np.zeros(1, dtype=util.DTYPE_STATE)
@@ -134,10 +153,75 @@ def plot(infile, (outfile, outfile_hist, frame_file)):
         pylab.axvline(x_max, c=c)
     pylab.savefig(outfile, dpi=300)
     pylab.figure()
-    pylab.imshow(data['frame'], interpolation='nearest')
-    pylab.savefig(frame_file)
+    frame = data['frame']
+    pylab.subplot(1, 2, 1)
+    pylab.imshow(frame, interpolation='nearest')
+    maxpoint = np.argmax(frame)
+    y, x = np.unravel_index(maxpoint, frame.shape)
+    pylab.axhline(y)
+    pylab.axvline(x)
+    pylab.subplot(1, 2, 2)
+    pylab.plot(frame[y, :])
+    pylab.savefig(frame_file, dpi=300)
 
-# def params_rendered():
+
+
+@files(frame_params)
+def examine_frame((epoch_dir, epoch_config_filename, 
+            frame_agg_filename), outfile, epoch, frame):
+
+    np.random.seed(0)
+    
+    cf = pickle.load(open(epoch_config_filename))
+    frameagg = np.load(frame_agg_filename)
+    
+    frames = organizedata.get_frames(epoch_dir, np.array([frame]))
+    frame = frames[0]
+    frame_mean = frameagg['mean']
+    frame_std = np.sqrt(frameagg['variance'])
+    # for fi, f in enumerate(frames):
+    #     frames_normed = f.astype(float) - frame_mean
+    #     frames_trunc = np.maximum(frames_normed, 0)
+    #     assert np.min(frames_trunc) >= 0
+    #     assert np.max(frames_trunc) < 256
+    #     frames[fi] = frames_trunc
+
+    maxpoint = np.argmax(frame)
+    max_y, max_x = np.unravel_index(maxpoint, frame.shape)
+
+    pylab.figure()
+    pylab.subplot(3, 2, 1)
+    pylab.imshow(frame, interpolation='nearest')
+    pylab.axhline(max_y, c='r', alpha=0.3)
+    pylab.axvline(max_x, c='g', alpha=0.3)
+
+    pylab.subplot(3, 2, 3)
+    pylab.plot(frame[max_y, :], 'r')
+    pylab.plot(frame[:, max_x], 'g')
+
+    # attempt to select all pix that are outside their std dev
+
+    pyplot.subplot(3, 2, 5)
+    pylab.imshow(frame, interpolation='nearest', cmap=pylab.cm.gray)
+
+    for thold_i, thold in enumerate([240, 250, 255]):
+        #outlier_mask = frame > (frame_mean + 2*frame_std)
+        high_mask = frame >= thold
+
+        tgt_mask = high_mask # np.logical_and(high_mask, outlier_mask)
+        frame2 = frame.copy()
+
+        S = 6
+        a = scipy.ndimage.binary_dilation(tgt_mask, 
+                                          structure=np.ones((S, S)))
+        frame2[np.logical_not(a)] = 0
+
+        pyplot.subplot(3, 2, 2*thold_i + 2)
+        pylab.imshow(frame2, interpolation='nearest', cmap=pylab.cm.gray)
+
+    pylab.savefig(outfile, dpi=400)
+
+# Def params_rendered():
 #     for p in params():
 #          yield ((p[0][0], p[0][1], p[1]), p[1] + ".pdf")
 
@@ -199,4 +283,4 @@ def plot(infile, (outfile, outfile_hist, frame_file)):
 #     pylab.savefig(plot_filename)
 
 
-pipeline_run([score_frame, plot], multiprocess=4)
+pipeline_run([examine_frame], multiprocess=4)
