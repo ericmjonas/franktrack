@@ -6,7 +6,6 @@ import numpy as np
 import scipy.stats
 import scipy.ndimage
 import cPickle as pickle
-from matplotlib import pyplot
 import likelihood
 import util2 as util
 import model
@@ -24,15 +23,15 @@ import pf
 
 FL_DATA = "data/fl"
 def params():
-    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
-              'bukowski_04.C', 'bukowski_04.linear']
-    FRAMES = np.arange(100)*50
+    EPOCHS = ['bukowski_04.W1']# , 'bukowski_04.W2', 
+    #'bukowski_04.C', 'bukowski_04.linear']
+    FRAMES = np.arange(10)*50
     
     for epoch in EPOCHS:
         for frame in FRAMES:
             infile = [os.path.join(FL_DATA, epoch), 
                       os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                      os.path.join(FL_DATA, epoch, 'frameagg.npz'), 
+                      os.path.join(FL_DATA, epoch, 'framehist.npz'), 
                       ]
 
             outfile = '%s.likelihoodscores.%05d.npz' % (epoch, frame)
@@ -41,7 +40,7 @@ def params():
            
 def frame_params():
     EPOCHS = [os.path.split(f)[1] for f in glob.glob(FL_DATA + "/*")]
-    FRAMES = np.arange(100)*50
+    FRAMES = np.arange(10)*50
     
     for epoch in EPOCHS:
         for frame_pos in FRAMES:
@@ -49,7 +48,8 @@ def frame_params():
                 frame = frame_pos + f
                 infile = [os.path.join(FL_DATA, epoch), 
                           os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                          os.path.join(FL_DATA, epoch, 'frameagg.npz'), 
+                          os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                          os.path.join(FL_DATA, epoch, 'framehist.npz'), 
                           ]
 
                 outfile = '%s.likelihoodscores.%05d.pdf' % (epoch, frame)
@@ -58,12 +58,12 @@ def frame_params():
 
 @files(params)
 def score_frame((epoch_dir, epoch_config_filename, 
-            frame_agg_filename), outfile, epoch, frame):
+            frame_hist_filename), outfile, epoch, frame):
 
     np.random.seed(0)
     
     cf = pickle.load(open(epoch_config_filename))
-    frameagg = np.load(frame_agg_filename)
+    framehist = np.load(frame_hist_filename)
     
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
@@ -76,9 +76,9 @@ def score_frame((epoch_dir, epoch_config_filename,
     frames = organizedata.get_frames(epoch_dir, np.array([frame]))
 
     # create the state vector
-    x_range = np.linspace(0, cf['field_dim_m'][1], 1)
-    y_range = np.linspace(0, cf['field_dim_m'][0], 1)
-    phi_range = np.linspace(0, 2*np.pi, 1)
+    x_range = np.linspace(0, cf['field_dim_m'][1], 200)
+    y_range = np.linspace(0, cf['field_dim_m'][0], 200)
+    phi_range = np.linspace(0, 2*np.pi, 16)
     theta_range = np.array([np.pi/2.])
 
     state = np.zeros(1, dtype=util.DTYPE_STATE)
@@ -87,8 +87,8 @@ def score_frame((epoch_dir, epoch_config_filename,
     scores = np.zeros((len(y_range), len(x_range), 
                        len(phi_range), len(theta_range)), 
                       dtype=np.float32)
-
-    frame_mean = frameagg['mean']
+    frame_hist = framehist['hist']
+    frame_mean = np.mean(frame_hist, axis=2)
     # for fi, f in enumerate(frames):
     #     frames_normed = f.astype(float) - frame_mean
     #     frames_trunc = np.maximum(frames_normed, 0)
@@ -121,7 +121,7 @@ def score_frame((epoch_dir, epoch_config_filename,
 
 
 @transform(score_frame, suffix(".npz"), [".png", ".hist.png", ".frame.png"])
-def plot(infile, (outfile, outfile_hist, frame_file)):
+def plot_likelihood(infile, (outfile, outfile_hist, frame_file)):
     data = np.load(infile)
     scores = data['scores']
     phi_range = data['phi_range']
@@ -167,24 +167,27 @@ def plot(infile, (outfile, outfile_hist, frame_file)):
 
 
 @files(frame_params)
-def examine_frame((epoch_dir, epoch_config_filename, 
-            frame_agg_filename), outfile, epoch, frame):
+def examine_frame((epoch_dir, epoch_config_filename, epoch_region_filename,
+            frame_hist_filename), outfile, epoch, frame):
 
     np.random.seed(0)
     
     cf = pickle.load(open(epoch_config_filename))
-    frameagg = np.load(frame_agg_filename)
-    
+    framehist = np.load(frame_hist_filename)
+    region = pickle.load(open(epoch_region_filename))
+
     frames = organizedata.get_frames(epoch_dir, np.array([frame]))
     frame = frames[0]
-    frame_mean = frameagg['mean']
-    frame_std = np.sqrt(frameagg['variance'])
-    # for fi, f in enumerate(frames):
-    #     frames_normed = f.astype(float) - frame_mean
-    #     frames_trunc = np.maximum(frames_normed, 0)
-    #     assert np.min(frames_trunc) >= 0
-    #     assert np.max(frames_trunc) < 256
-    #     frames[fi] = frames_trunc
+    frame_hist = framehist['hist']
+    frame_mean = np.mean(frame_hist, axis=2)
+
+    env = util.Environmentz(cf['field_dim_m'], 
+                            cf['frame_dim_pix'])
+    
+    region_lower_corner = env.gc.real_to_image(region['x_pos_min'], 
+                                             region['y_pos_min'])
+    region_upper_corner = env.gc.real_to_image(region['x_pos_max'], 
+                                             region['y_pos_max'])
 
     maxpoint = np.argmax(frame)
     max_y, max_x = np.unravel_index(maxpoint, frame.shape)
@@ -200,11 +203,13 @@ def examine_frame((epoch_dir, epoch_config_filename,
     pylab.plot(frame[:, max_x], 'g')
 
     # attempt to select all pix that are outside their std dev
-
-    pyplot.subplot(3, 2, 5)
+    pylab.subplot(3, 2, 5)
     pylab.imshow(frame, interpolation='nearest', cmap=pylab.cm.gray)
-
-    for thold_i, thold in enumerate([240, 250, 255]):
+    
+    pylab.gca().add_patch(pylab.Rectangle(region_lower_corner,
+                              region_upper_corner[0] - region_lower_corner[0], 
+                              region_upper_corner[1] - region_lower_corner[1], fill=False, linewidth=2, edgecolor='r'))
+    for thold_i, thold in enumerate([250, 255]):
         #outlier_mask = frame > (frame_mean + 2*frame_std)
         high_mask = frame >= thold
 
@@ -216,9 +221,20 @@ def examine_frame((epoch_dir, epoch_config_filename,
                                           structure=np.ones((S, S)))
         frame2[np.logical_not(a)] = 0
 
-        pyplot.subplot(3, 2, 2*thold_i + 2)
+        pylab.subplot(3, 2, 2*thold_i + 2)
         pylab.imshow(frame2, interpolation='nearest', cmap=pylab.cm.gray)
 
+    # # now look at entropy of spots
+    # ent = np.zeros((frame_hist.shape[0], frame_hist.shape[1]))
+    # for r in range(frame_hist.shape[0]):
+    #     for c in range(frame_hist.shape[1]):
+    #         v = frame_hist[r, c]
+    #         not_zeros = v > 0
+    #         p = v / np.sum(v)
+            
+    #         ent[r, c] = -np.sum(p[not_zeros] * np.log2(p[not_zeros]))
+    # pylab.subplot(3, 2, 6)
+    # pylab.imshow(ent)
     pylab.savefig(outfile, dpi=400)
 
 # Def params_rendered():
@@ -283,4 +299,4 @@ def examine_frame((epoch_dir, epoch_config_filename,
 #     pylab.savefig(plot_filename)
 
 
-pipeline_run([examine_frame], multiprocess=4)
+pipeline_run([plot_likelihood], multiprocess=4)

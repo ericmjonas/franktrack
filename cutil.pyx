@@ -28,3 +28,16 @@ def score_slow(np.ndarray[np.float32_t, ndim=2] proposed,
     s = - np.sum(np.abs(delta))
 
     return s
+
+#@cython.boundscheck(False)
+def frame_hist_add(np.ndarray[np.float32_t, ndim=3] hist, 
+                   np.ndarray[np.uint8_t, ndim=2] img):
+
+    cdef int rmax = hist.shape[0]
+    cdef int cmax = hist.shape[1]
+    cdef int p
+    
+    for r in range(rmax):
+        for c in range(cmax):
+            p = img[r, c]
+            hist[r, c, p] += 1

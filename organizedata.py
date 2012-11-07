@@ -9,6 +9,13 @@ import cPickle as pickle
 import tempfile
 from matplotlib import pylab
 
+import pyximport;
+
+pyximport.install(setup_args={'include_dirs': np.get_include()})
+
+import cutil
+
+
 import scipy.ndimage
 
 """
@@ -265,8 +272,11 @@ def package_fl_frames((postimestamp, videodir, epoch),
     config.update(params)
     pickle.dump(config, file(config_pickle, 'w'))
 
-@transform(package_fl_frames, suffix("positions.npy"), "frameagg.npz")
-def compute_background(infiles, outfile):
+@transform(package_fl_frames, suffix("positions.npy"), "framehist.npz")
+def compute_histogram(infiles, outfile):
+    """
+    For each point, compute the distribution over pixel values. 
+    """
     position_file = infiles[0]
     basedir = infiles[1]
     cf = pickle.load(open(infiles[2]))
@@ -279,24 +289,62 @@ def compute_background(infiles, outfile):
     def chunker(seq, size):
         return (seq[pos:pos + size] for pos in xrange(0, len(seq), size))
 
+    
     # incremental variance calculation
-    n = 0
-    mean = np.zeros(frame_shape, dtype=np.float32)
-    M2 = np.zeros(frame_shape, dtype=np.float32)
+    hist = np.zeros((frame_shape[0], frame_shape[1], 256), dtype=np.float32)
 
     for fis in chunker(allframes, 1000):
         fs = get_frames(basedir, fis)
-        for x in fs:
-
-            n = n + 1
-            delta = x - mean
-            mean +=  delta/n
-            M2 += delta*(x - mean)
-
-    variance = M2/(n - 1)
-
-    np.savez_compressed(outfile, mean=mean, variance=variance)
+        print fis[0]
+        for framei, frame in enumerate(fs):
+            cutil.frame_hist_add(hist, frame)
+    np.savez_compressed(outfile, hist=hist)
     
+@transform(package_fl_frames, suffix("positions.npy"), "region.pickle")
+def compute_region(infiles, outfile):
+    """
+    For each point, compute the distribution over pixel values. 
+    """
+    position_file = infiles[0]
+    basedir = infiles[1]
+    cf = pickle.load(open(infiles[2]))
+    
+    positions = np.load(position_file)
+    x_pos = positions['x'] 
+    x_pos_nz = x_pos[x_pos > 0]
+    y_pos = positions['y']
+    y_pos_nz = y_pos[y_pos > 0]
+    region = {}
+
+    FUDGE = 0.20
+
+    x_min = np.min(x_pos_nz)
+    x_max = np.max(x_pos_nz)
+    x_width = x_max - x_min
+    x_mean = np.mean([x_min, x_max])
+    
+
+    x_width_larger = x_width * (1 + FUDGE)
+    region['x_pos_min'] = x_mean - x_width_larger/2.
+    region['x_pos_max'] = x_mean + x_width_larger/2.
+
+    y_min = np.min(y_pos_nz)
+    y_max = np.max(y_pos_nz)
+    y_width = y_max - y_min
+    y_mean = np.mean([y_min, y_max])
+    
+
+    y_width_larger = y_width * (1 + FUDGE)
+    region['y_pos_min'] = y_mean - y_width_larger/2.
+    region['y_pos_max'] = y_mean + y_width_larger/2.
+
+
+    # remove zeros
+    
+
+    pickle.dump(region, open(outfile, 'w'))
+
 if __name__ == "__main__":    
-    pipeline_run([package_fl_frames, compute_background], multiprocess=3)
+    pipeline_run([package_fl_frames, compute_histogram, 
+                  compute_region], multiprocess=3)
     

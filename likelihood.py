@@ -134,10 +134,10 @@ class EvaluateObj(object):
 
 
 class LikelihoodEvaluator(object):
-    def __init__(self, env, evaluate_obj, log=False):
+    def __init__(self, env, evaluate_obj, similarity = 'absdif'):
         self.env = env
         self.evaluate_obj = evaluate_obj
-        self.log = log
+        self.similarity = similarity
         
 
     def score_state(self, state, img):
@@ -184,8 +184,11 @@ class LikelihoodEvaluator(object):
         pi_pix = proposed_img*255
         img = img[rr_y[0]:rr_y[1], 
                   rr_x[0]:rr_x[1]]
-        delta = (pi_pix - img.astype(np.float32))
-        s = - np.sum(np.abs(delta))
+        if similarity == 'absdif':
+            delta = (pi_pix - img.astype(np.float32))
+            s = - np.sum(np.abs(delta))
+        else:
+            
         return s
 
 class DiodeGeom(object):
