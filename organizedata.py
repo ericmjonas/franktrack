@@ -42,11 +42,11 @@ def generate_files_fl():
     """
     # walter's data
 
-    BASEDIR = "original.data/Bukowski"
+    WALTER_BASEDIR = "original.data/Bukowski"
     for i in range(2, 5):
         name = "bukowski_%02d" % i
         # get the base from the mpeg
-        p = glob.glob(os.path.join(BASEDIR, name, "*.mpeg"))
+        p = glob.glob(os.path.join(WALTER_BASEDIR, name, "*.mpeg"))
         basepath = p[0][:-5]
 
         mpeg = basepath + ".mpeg"
@@ -58,6 +58,21 @@ def generate_files_fl():
                   'frame_dim_pix': (240, 320)}
 
         yield (mpeg, postimestamp, awake_epochs, name, params)
+    
+    #Jai's data
+    JAI_BASEDIR = "original.data/jai"
+    for f in glob.glob(os.path.join(JAI_BASEDIR, "[HI]*.mpeg")):
+        name = os.path.basename(f)[:-len('.mpeg')]
+        basepath = os.path.join(JAI_BASEDIR, name)
+        mpeg = f
+        postimestamp = basepath + ".cpupostimestamp"
+        epochs = glob.glob(basepath + "_*.p")
+        # no way to figure out which epochs are awake
+
+        params = {'field_dim_m' : (1.5, 2.0),  
+                  'frame_dim_pix': (240, 320)}
+
+        yield (mpeg, postimestamp, epochs, name, params)
 
 def generate_files_fl_proc():
     for mpeg, postimestamp, awake_epochs, name, params in generate_files_fl():
@@ -158,7 +173,15 @@ def mpeg_to_stills(infiles, outfiles, name):
     # now subprocess.call
     subprocess.call(["mplayer", "-vo", "jpeg:outdir=%s" % outfiles, 
                     mpeg_file])
-    print outfiles
+
+    # count files 
+    FRAMEN = len(glob.glob(os.path.join(outfiles, "*.jpg")))
+    # now, for outfiles, rename each one down a frame
+    for i in range(FRAMEN):
+        src = os.path.join(outfiles, "%08d.jpg" % (i+1))
+        dest = os.path.join(outfiles, "%08d.jpg" % (i,))
+        os.rename(src, dest)
+
 #def render_output([mpeg, postimestamp, awake_epochs], 
 
 def package_frames(framedir, start_f, end_f, outdir):
