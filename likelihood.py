@@ -188,7 +188,7 @@ class LikelihoodEvaluator(object):
             delta = (pi_pix - img.astype(np.float32))
             s = - np.sum(np.abs(delta))
         else:
-            
+            pass
         return s
 
 class DiodeGeom(object):
