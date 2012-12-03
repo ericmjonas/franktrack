@@ -26,9 +26,13 @@ def avg_delta_conf_threshold(delta, conf, tholds):
 
     returns a vector as long as tholds
     """
-    results = np.zeros(len(tholds))
+    N = len(delta)
+    results = np.zeros(len(tholds), dtype=np.float32)
+    fractions = np.zeros(len(tholds), dtype=np.float32)
 
     # stupid slow naive 
     for ti, thold in enumerate(tholds):
-        results[ti] = np.mean(delta[conf >= thold])
-    return results
+        idx = np.argwhere(conf >= thold)
+        results[ti] = np.mean(delta[idx])
+        fractions[ti] = len(idx) / float(N)
+    return results, fractions

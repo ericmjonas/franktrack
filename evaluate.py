@@ -49,11 +49,13 @@ def run_comparison((truth_file, algorithm_output),
     delta = compare.xy_compare(algo_data, truth_data)
     tholds = np.arange(0, 1.0, 0.1)
 
-    confs = compare.avg_delta_conf_threshold(delta, algo_data['confidence'], 
-                                               tholds)
+    confs, fractions = compare.avg_delta_conf_threshold(delta, 
+                                                        algo_data['confidence'], 
+                                                        tholds)
     print "tholds=", tholds
     print "confs=", confs
     pickle.dump({'confs': confs, 
+                 'fractions': fractions,
                  'tholds' : tholds,
                  'dataset' : dataset, 
                  'algorithm' : algorithm}, 
