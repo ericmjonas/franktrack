@@ -104,7 +104,7 @@ def detect_invalid_sep(positions, thold_std= 4):
     return np.argwhere(sep > (sep_std*thold_std + sep_mean))[:, 0]
 
 
-REPORT_DIR = "."
+REPORT_DIR = "figs"
 
 @transform(os.path.join(DATA_DIR, "*/positions.npy"), 
            regex(r".+/(.+)/positions.npy$"), 
@@ -297,7 +297,8 @@ def difficult_regions(positions_file, (hard_tracking_region, )):
 
     
 if __name__ == "__main__":
-    pipeline_run([agg_stats, sanity_check, difficult_regions])
+    pipeline_run([agg_stats, sanity_check, difficult_regions], 
+                 multiprocess=4)
     
     
     

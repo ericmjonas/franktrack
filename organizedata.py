@@ -74,6 +74,27 @@ def generate_files_fl():
 
         yield (mpeg, postimestamp, epochs, name, params)
 
+    # Shantanu's data
+    SHANTANU_BASEDIR = "original.data/shantanu"
+    SHANTANU_ONLY_FIRST_N = 1
+    for fi, f in enumerate(glob.glob(os.path.join(SHANTANU_BASEDIR, "*/*.mpeg"))):
+        mpeg = f
+        filebasename = os.path.basename(f)[:-len('.mpeg')]
+        expname = os.path.split(os.path.split(f)[0])[1]
+        basepath = os.path.join(SHANTANU_BASEDIR, expname, filebasename)
+
+        postimestamp = os.path.join(SHANTANU_BASEDIR, expname, "day_date.postimestamp")
+        epochs = glob.glob(basepath + "_*.p")
+        
+        # no way to figure out which epochs are awake
+
+        params = {'field_dim_m' : (1.5, 2.0),  
+                  'frame_dim_pix': (240, 320)}
+        name = "shantanu_%s" % expname
+        if fi > SHANTANU_ONLY_FIRST_N :
+            return
+        yield (mpeg, postimestamp, epochs, name, params)
+
 def generate_files_fl_proc():
     for mpeg, postimestamp, awake_epochs, name, params in generate_files_fl():
         infiles = [mpeg, postimestamp] +  awake_epochs
