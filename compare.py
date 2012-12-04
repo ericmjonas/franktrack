@@ -14,8 +14,9 @@ def xy_compare(xyconf, xy_true):
     """
     Compare two x-y vectors returning
     """
+    N = len(xyconf)
     delta = dist_delta(xyconf['x'], xyconf['y'], 
-                       xy_true['x'], xy_true['y'])
+                       xy_true['x'][:N], xy_true['y'][:N])
     
     return delta
     

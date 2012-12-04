@@ -1,8 +1,12 @@
 import numpy as np
 import cPickle as pickle
 import os
+import util2 as util
 import measure
+import methods
+import organizedata
 from ruffus import * 
+
 
 DATA_DIR = "data/fl"
 def ddir(x):
@@ -15,6 +19,8 @@ def rdir(x):
 DTYPE_POS_CONF = [('x', np.float32), 
                   ('y', np.float32), 
                   ('confidence', np.float32)]
+
+FRAMES_TO_ANALYZE = 100 # Analyze this many frames in each epoch
 
 def truth(basedir):
     """
@@ -67,6 +73,54 @@ def current_method(basedir):
     assert np.isnan(d['x']).all() == False
     return d
 
+def current_method(basedir):
+    positions_file = os.path.join(basedir, "positions.npy")
+    positions = np.load(positions_file)
+
+    conf = np.ones(len(positions))
+    conf[np.isnan(positions['x'])] = 0.0
+    # since this requires manual input, these empty spots will be surrounded
+    # by valid positions
+    conf_exp = conf.copy()
+    zeros = np.argwhere(conf < 0.9)[1:-1] # round off edge cases
+    conf_exp[zeros+1] = 0.0
+    conf_exp[zeros-1] = 0.0
+
+    d = np.zeros(len(positions), dtype=DTYPE_POS_CONF)
+    # now we do a trick
+
+    d['x'] = positions['x']
+    d['y'] = positions['y']
+    d['x'][conf_exp == 0.0] = 0.0
+    d['y'][conf_exp == 0.0] = 0.0
+
+    d['confidence'] = conf_exp
+    assert np.isnan(d['x']).all() == False
+    return d
+
+
+
+def per_frame(basedir, func, config):
+    config_file = os.path.join(basedir, "config.pickle")
+    cf = pickle.load(open(config_file))
+    env = util.Environmentz(cf['field_dim_m'], cf['frame_dim_pix'])
+    FRAMEN = cf['end_f'] - cf['start_f'] + 1
+    
+
+    d = np.zeros(FRAMES_TO_ANALYZE, dtype=DTYPE_POS_CONF)
+    FRAMES_AT_A_TIME = 10
+    frames = np.arange(FRAMES_TO_ANALYZE)
+    for frame_subset in util.chunk(frames, FRAMES_AT_A_TIME):
+        fs = organizedata.get_frames(basedir, frame_subset)
+        for fi, frame_no in enumerate(frame_subset):
+            real_x, real_y, conf = func(fs[fi], env, **config)
+            d[frame_no]['x'] = real_x
+            d[frame_no]['y'] = real_y
+            d[frame_no]['confidence'] = conf
+            
+    return d
+
+
 @transform(ddir("*/positions.npy"), 
            regex(r".+/(.+)/positions.npy$"), 
            [os.path.join(REPORT_DIR, 
@@ -78,6 +132,12 @@ def get_truth(positions_file, (output_file, ), basedir):
     os.makedirs(rdir(basedir))
     np.save(output_file, truth_data)
 
+def algodir(basedir):
+    try:
+        os.makedirs(rdir(os.path.join(basedir, "algo")))
+    except OSError:
+        pass
+    
 @transform(ddir("*/positions.npy"), 
            regex(r".+/(.+)/positions.npy$"), 
            [os.path.join(REPORT_DIR, 
@@ -86,12 +146,24 @@ def get_truth(positions_file, (output_file, ), basedir):
            )
 def get_algo_current(positions_file, (output_file, ), basedir):
     algo_data = current_method(ddir(basedir))
-    try:
-        os.makedirs(rdir(os.path.join(basedir, "algo")))
-    except OSError:
-        pass
+    algodir(basedir)
+    algo_data = current_method(ddir(basedir))
+                          
+    np.save(output_file, algo_data)
 
+@transform(ddir("*/positions.npy"), 
+           regex(r".+/(.+)/positions.npy$"), 
+           [os.path.join(REPORT_DIR, 
+                         r"\1", "algo", "centroid.npy")], 
+           r"\1"
+           )
+def get_algo_centroid(positions_file, (output_file, ), basedir):
+    print "basedir=", basedir, "ddir(basedir)=", ddir(basedir)
+    algodir(ddir(basedir))
+    algo_data = per_frame(ddir(basedir), 
+                          methods.centroid_frame, {'thold' : 240})
+    
     np.save(output_file, algo_data)
 
 if __name__ == "__main__":
-    pipeline_run([get_truth, get_algo_current])
+    pipeline_run([get_truth, get_algo_current, get_algo_centroid])

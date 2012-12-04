@@ -89,6 +89,11 @@ class GeomConverter(object):
         return (orig_x * self.pix_per_meter[1], 
                 orig_y * self.pix_per_meter[0])
 
+    def image_to_real(self, pix_x, pix_y):
+        y = float(pix_y ) / self.pix_per_meter[0]
+        x = float(pix_x) / self.pix_per_meter[1]
+        return self.lower_left[1] + x, self.lower_left[0] + y
+
         
 
 def normal_rv(x, var):
@@ -146,3 +151,8 @@ def credible_interval(samples, weights,
     creds = np.searchsorted(cs, [lower, upper])
     return np.array(s_sorted[creds])
     
+def chunk(l, n):
+    """ Yield successive n-sized chunks from l.
+    """
+    for i in xrange(0, len(l), n):
+        yield l[i:i+n]

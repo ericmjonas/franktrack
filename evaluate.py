@@ -25,7 +25,7 @@ def comparisons():
     datasets = glob(ddir("*"))
     
     # for each algorithm 
-    algorithms = ['current']
+    algorithms = ['current', 'centroid']
     for dataset in datasets:
         for algorithm in algorithms:
             dataset_name = dataset[len(DATA_DIR)+1:]
