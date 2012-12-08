@@ -37,3 +37,4 @@ def avg_delta_conf_threshold(delta, conf, tholds):
         results[ti] = np.mean(delta[idx])
         fractions[ti] = len(idx) / float(N)
     return results, fractions
+

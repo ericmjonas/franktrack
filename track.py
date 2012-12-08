@@ -20,7 +20,7 @@ DTYPE_POS_CONF = [('x', np.float32),
                   ('y', np.float32), 
                   ('confidence', np.float32)]
 
-FRAMES_TO_ANALYZE = 100 # Analyze this many frames in each epoch
+FRAMES_TO_ANALYZE = 5000 # Analyze this many frames in each epoch
 
 def truth(basedir):
     """
@@ -166,4 +166,5 @@ def get_algo_centroid(positions_file, (output_file, ), basedir):
     np.save(output_file, algo_data)
 
 if __name__ == "__main__":
-    pipeline_run([get_truth, get_algo_current, get_algo_centroid])
+    pipeline_run([get_truth, get_algo_current, get_algo_centroid], 
+                 multiprocess=4)

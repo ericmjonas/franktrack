@@ -11,9 +11,9 @@ from matplotlib import pylab
 
 import pyximport;
 
-pyximport.install(setup_args={'include_dirs': np.get_include()})
+#pyximport.install(setup_args={'include_dirs': np.get_include()})
 
-import cutil
+#import cutil
 
 
 import scipy.ndimage
