@@ -2,25 +2,18 @@ import numpy as np
 import cPickle as pickle
 import os
 import util2 as util
+from util2 import ddir, rdir
 import measure
 import methods
 import organizedata
 from ruffus import * 
 
 
-DATA_DIR = "data/fl"
-def ddir(x):
-    return os.path.join(DATA_DIR, x)
-
-REPORT_DIR = "results"
-def rdir(x):
-    return os.path.join(REPORT_DIR, x)
-
 DTYPE_POS_CONF = [('x', np.float32), 
                   ('y', np.float32), 
                   ('confidence', np.float32)]
 
-FRAMES_TO_ANALYZE = 5000 # Analyze this many frames in each epoch
+FRAMES_TO_ANALYZE = 15000 # Analyze this many frames in each epoch
 
 def truth(basedir):
     """
@@ -129,7 +122,10 @@ def per_frame(basedir, func, config):
            )
 def get_truth(positions_file, (output_file, ), basedir):
     truth_data = truth(ddir(basedir))
-    os.makedirs(rdir(basedir))
+    try:
+        os.makedirs(rdir(basedir))
+    except OSError:
+        pass
     np.save(output_file, truth_data)
 
 def algodir(basedir):

@@ -296,6 +296,61 @@ def difficult_regions(positions_file, (hard_tracking_region, )):
     pylab.savefig(hard_tracking_region, dpi=300)
 
     
+@transform(os.path.join(DATA_DIR, "*/framehist.npz"), 
+           regex(r".+/(.+)/framehist.npz$"), 
+           [os.path.join(REPORT_DIR, 
+                         r"\1.entropy.png")]
+            )
+def entropy_vs_pos(positions_file, (pix_entropypix,)):
+    positions = np.load(positions_file)
+    basedir = os.path.dirname(positions_file)
+    cf = pickle.load(open(os.path.join(basedir, "config.pickle")))
+
+    invalid_sep = detect_invalid_sep(positions)
+    positions_cleaned = positions.copy()
+    positions_cleaned[invalid_sep] = ((np.nan, np.nan), 
+                                      (np.nan, np.nan), np.nan, np.nan)
+    
+    positions_interp, missing = interpolate(positions)
+    pci, cleaned_missing = interpolate(positions_cleaned)
+    
+    # find the regions of NA
+    
+    f = pylab.figure()
+    pylab.subplot(2, 1, 1)
+    pylab.plot(pci['x'], pci['y'], c='k', alpha=0.3)
+    pylab.scatter(pci['x'][missing], 
+                  pci['y'][missing], 
+                  linewidth='0', s=3, c='b', 
+                  label='omitted pos')
+    pylab.scatter(pci['x'][invalid_sep], 
+                  pci['y'][invalid_sep],
+                  linewidth='0', s=6, c='r', 
+                  label='velocity error')
+    pylab.xlim((np.min(pci['x']), np.max(pci['x'])))
+    pylab.ylim((np.min(pci['y']), np.max(pci['y'])))
+    pylab.xlabel('x pos')
+    pylab.ylabel('y pos')
+    pylab.title(hard_tracking_region)
+
+    pylab.subplot(2, 1, 2)
+    pylab.axhline(0)
+    pylab.scatter(missing, np.ones_like(missing)*-0.2, c='b', 
+                  marker='|')
+    pylab.scatter(invalid_sep, np.ones_like(invalid_sep)*-0.2, c='r', 
+                  marker='|')
+    
+    # chunk and figure out what fraction of latest had missing points
+    x = np.zeros(len(pci))
+    x[cleaned_missing] = 1.0
+    res = np.convolve(x, np.ones(100)/100)
+    pylab.plot(res)
+
+    pylab.xlim(0, len(positions))
+    pylab.xlabel('time')
+    pylab.ylabel('fraction error')
+    pylab.savefig(hard_tracking_region, dpi=300)
+
 if __name__ == "__main__":
     pipeline_run([agg_stats, sanity_check, difficult_regions], 
                  multiprocess=4)

@@ -1,4 +1,3 @@
-import cv
 import numpy as np
 from matplotlib import pylab
 import os

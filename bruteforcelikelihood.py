@@ -21,22 +21,25 @@ import glob
 from ruffus import * 
 import pf
 
+PIX_THRESHOLD = 200
 FL_DATA = "data/fl"
+EO_PARAMS = (14, 4, 2)
 def params():
-    EPOCHS = ['bukowski_04.W1']# , 'bukowski_04.W2', 
+    EPOCHS = ['bukowski_04.W2', 'bukowski_04.C']# , 'bukowski_04.W2', 
     #'bukowski_04.C', 'bukowski_04.linear']
-    FRAMES = np.arange(10)*50
+    FRAMES = np.arange(50)*200
     
     for epoch in EPOCHS:
         for frame in FRAMES:
-            infile = [os.path.join(FL_DATA, epoch), 
+            infiles = [os.path.join(FL_DATA, epoch), 
                       os.path.join(FL_DATA, epoch, 'config.pickle'), 
                       os.path.join(FL_DATA, epoch, 'framehist.npz'), 
                       ]
-
-            outfile = '%s.likelihoodscores.%05d.npz' % (epoch, frame)
+            basename = '%s.likelihoodscores.%05d' % (epoch, frame)
+            outfiles = [basename + ".wait.pickle", 
+                        basename + ".wait.npz"]
             
-            yield (infile, outfile, epoch, frame)
+            yield (infiles, outfiles, epoch, frame)
            
 def frame_params():
     EPOCHS = [os.path.split(f)[1] for f in glob.glob(FL_DATA + "/*")]
@@ -57,185 +60,263 @@ def frame_params():
                 yield (infile, outfile, epoch, frame)
 
 @files(params)
-def score_frame((epoch_dir, epoch_config_filename, 
-            frame_hist_filename), outfile, epoch, frame):
+def score_frame_queue((dataset_dir, dataset_config_filename, 
+            frame_hist_filename), (outfile_wait, 
+                                   outfile_npz), dataset_name, frame):
 
     np.random.seed(0)
     
-    cf = pickle.load(open(epoch_config_filename))
-    framehist = np.load(frame_hist_filename)
-    
-    env = util.Environmentz(cf['field_dim_m'], 
-                            cf['frame_dim_pix'])
+    dataset_dir = os.path.join(FL_DATA, dataset_name)
 
-    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
-    eo.set_params(10, 4, 2)
-    
-    le = likelihood.LikelihoodEvaluator(env, eo)
+    cf = pickle.load(open(dataset_config_filename))
 
-    frames = organizedata.get_frames(epoch_dir, np.array([frame]))
 
-    # create the state vector
-    x_range = np.linspace(0, cf['field_dim_m'][1], 200)
-    y_range = np.linspace(0, cf['field_dim_m'][0], 200)
-    phi_range = np.linspace(0, 2*np.pi, 16)
-    theta_range = np.array([np.pi/2.])
+    x_range = np.linspace(0, cf['field_dim_m'][1], 240)
+    y_range = np.linspace(0, cf['field_dim_m'][0], 240)
+    phi_range = np.linspace(0, 2*np.pi, 32)
+    degrees_from_vertical = 45 
+    radian_range = degrees_from_vertical/180. * np.pi
+    theta_range = np.linspace(np.pi/2.-radian_range, 
+                              np.pi/2. + radian_range, 12)
 
-    state = np.zeros(1, dtype=util.DTYPE_STATE)
-    
-    # now evaluate
-    scores = np.zeros((len(y_range), len(x_range), 
-                       len(phi_range), len(theta_range)), 
-                      dtype=np.float32)
-    frame_hist = framehist['hist']
-    frame_mean = np.mean(frame_hist, axis=2)
-    # for fi, f in enumerate(frames):
-    #     frames_normed = f.astype(float) - frame_mean
-    #     frames_trunc = np.maximum(frames_normed, 0)
-    #     assert np.min(frames_trunc) >= 0
-    #     assert np.max(frames_trunc) < 256
-    #     frames[fi] = frames_trunc
+    sv = create_state_vect(y_range, x_range, phi_range, theta_range)
 
-    for yi, y in enumerate(y_range):
-        print yi, len(y_range)
-        for xi, x in enumerate(x_range):
-            for phii, phi in enumerate(phi_range):
-                for thetai, theta in enumerate(theta_range):
-                    state['x'][0] = x
-                    state['y'][0] = y
-                    state['phi'][0] = phi
-                    state['theta'][0] = theta
+    # now the input args
+    chunk_size = 40000
+    chunks = int(np.ceil(len(sv) / float(chunk_size)))
 
-                    score = le.score_state(state, frames[0])
-                    scores[yi, xi, phii, thetai] = score
+    args = []
+    for i in range(chunks):
+        args += [  (i*chunk_size, (i+1)*chunk_size)]
 
-    # videotools.dump_grey_movie('test.avi', y)
+    CN = chunks
+    results = []
 
-    # weights, particles = pf.particle_filter(y, model_inst, 
-    #                                         len(y), PARTICLEN)
-    np.savez_compressed(outfile, 
+    jids = cloud.map(picloud_score_frame, [dataset_name]*CN,
+                     [x_range]*CN, [y_range]*CN, 
+                     [phi_range]*CN, [theta_range]*CN, 
+                     args, [frame]*CN,  
+                     _type='f2', _vol="my-vol", _env="base/precise")
+
+    np.savez_compressed(outfile_npz, 
                         x_range = x_range, y_range=y_range, 
-                        phi_range = phi_range, theta_range = theta_range,
-                        scores=scores, frame=frames[0], 
-                        frame_mean = frame_mean)
+                        phi_range = phi_range, theta_range = theta_range)
+    pickle.dump({'frame' : frame, 
+                 'dataset_name' : dataset_name, 
+                 'dataset_dir' : dataset_dir, 
+                 'jids' : jids}, open(outfile_wait, 'w'))
 
 
-@transform(score_frame, suffix(".npz"), [".png", ".hist.png", ".frame.png"])
-def plot_likelihood(infile, (outfile, outfile_hist, frame_file)):
-    data = np.load(infile)
+@transform(score_frame_queue, regex(r"(.+).wait.(.+)$"), [r"\1.pickle", r"\1.npz"])
+def score_frame_wait((infile_wait, infile_npz), (outfile_pickle, outfile_npz)):
+    dnpz = np.load(infile_npz)
+    p = pickle.load(open(infile_wait))
+    
+    jids = p['jids']
+
+    results = cloud.result(jids)
+    scores = np.concatenate(results)
+    np.savez_compressed(outfile_npz, scores=scores, **dnpz)
+    pickle.dump(p, open(outfile_pickle, 'w'))
+    # save the results
+    
+#     data = np.load(infile)
+#     scores = data['scores']
+#     phi_range = data['phi_range']
+#     x = int(np.ceil(np.sqrt(len(phi_range))))
+
+
+@transform(score_frame_wait, suffix(".pickle"), [".png", ".hist.png"])
+def plot_likelihood((infile_pickle, infile_npz),
+                    (outfile, outfile_hist)):
+    data = np.load(infile_npz)
+    data_p = pickle.load(open(infile_pickle))
     scores = data['scores']
-    phi_range = data['phi_range']
-    x = int(np.ceil(np.sqrt(len(phi_range))))
 
-    max_scores_i = np.argmax(scores)
-    (ms_y, ms_x, ms_phi, ms_theta) = np.unravel_index(max_scores_i, 
-                                                      scores.shape)
+    sv = create_state_vect(data['y_range'], data['x_range'], 
+                           data['phi_range'], data['theta_range'])
+
+    scores = scores[:len(sv)]
+
     pylab.figure()
     pylab.hist(scores.flat, bins=255)
     pylab.savefig(outfile_hist, dpi=300)
-    # use global min, max
-    minscore = np.min(scores)
-    maxscore = np.max(scores)
-    print "MAX SCORE =", maxscore
-    pylab.figure()
-    for pi, i in enumerate(phi_range):
-        pylab.subplot(x, x, pi +1)
-        img = scores[:, :, pi, 0]
-        i_max = np.argmax(img)
-        y_max, x_max = np.unravel_index(i_max, img.shape)
-        pylab.imshow(img, interpolation='nearest', 
-                     vmin=minscore, vmax=maxscore) 
-        if pi == ms_phi:
-            c = 'g'
-        else:
-            c = 'r'
-        pylab.axhline(y_max, c=c)
-        pylab.axvline(x_max, c=c)
-    pylab.savefig(outfile, dpi=300)
-    pylab.figure()
-    frame = data['frame']
-    pylab.subplot(1, 2, 1)
-    pylab.imshow(frame, interpolation='nearest')
-    maxpoint = np.argmax(frame)
-    y, x = np.unravel_index(maxpoint, frame.shape)
-    pylab.axhline(y)
-    pylab.axvline(x)
-    pylab.subplot(1, 2, 2)
-    pylab.plot(frame[y, :])
-    pylab.savefig(frame_file, dpi=300)
 
+    TOP_R, TOP_C = 3, 4
+    TOP_N = TOP_R * TOP_C
 
-
-@files(frame_params)
-def examine_frame((epoch_dir, epoch_config_filename, epoch_region_filename,
-            frame_hist_filename), outfile, epoch, frame):
-
-    np.random.seed(0)
+    score_idx_sorted = np.argsort(scores)[::-1]
     
-    cf = pickle.load(open(epoch_config_filename))
-    framehist = np.load(frame_hist_filename)
-    region = pickle.load(open(epoch_region_filename))
+    #get the frame
+    frames = organizedata.get_frames(data_p['dataset_dir'], 
+                                     np.array([data_p['frame']]))
 
-    frames = organizedata.get_frames(epoch_dir, np.array([frame]))
-    frame = frames[0]
-    frame_hist = framehist['hist']
-    frame_mean = np.mean(frame_hist, axis=2)
-
+    # config file
+    cf = pickle.load(open(os.path.join(data_p['dataset_dir'], 
+                                       'config.pickle')))
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
+
+    img = frames[0]
+    f = pylab.figure()
+    for r in range(TOP_N):
+        s_i = score_idx_sorted[r]
+        score = scores[s_i]
+        ax =f.add_subplot(TOP_R, TOP_C, r+1)
+        ax.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+        x_pix, y_pix = env.gc.real_to_image(sv[s_i]['x'], sv[s_i]['y'])
+        ax.axhline(y_pix, linewidth=1, c='b', alpha=0.5)
+        ax.axvline(x_pix, linewidth=1, c='b', alpha=0.5)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    f.subplots_adjust(bottom=0, left=.01, right=.99, top=.90, hspace=.1, wspace=.1)
+    f.savefig(outfile, dpi=300)
+
+@transform(score_frame_wait, suffix(".pickle"), [".zoom.png"])
+def plot_likelihood_zoom((infile_pickle, infile_npz),
+                         (zoom_outfile, )):
+    """
+    zoom in on the region of interest
+    plot front and back diodes
+    """
+    data = np.load(infile_npz)
+    data_p = pickle.load(open(infile_pickle))
+    scores = data['scores']
+
+    sv = create_state_vect(data['y_range'], data['x_range'], 
+                           data['phi_range'], data['theta_range'])
+
+    scores = scores[:len(sv)]
+
+    TOP_R, TOP_C = 3, 4
+    TOP_N = TOP_R * TOP_C
+
+    score_idx_sorted = np.argsort(scores)[::-1]
     
-    region_lower_corner = env.gc.real_to_image(region['x_pos_min'], 
-                                             region['y_pos_min'])
-    region_upper_corner = env.gc.real_to_image(region['x_pos_max'], 
-                                             region['y_pos_max'])
+    #get the frame
+    frames = organizedata.get_frames(data_p['dataset_dir'], 
+                                     np.array([data_p['frame']]))
 
-    maxpoint = np.argmax(frame)
-    max_y, max_x = np.unravel_index(maxpoint, frame.shape)
+    # config file
+    cf = pickle.load(open(os.path.join(data_p['dataset_dir'], 
+                                       'config.pickle')))
+    env = util.Environmentz(cf['field_dim_m'], 
+                            cf['frame_dim_pix'])
+    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
+    eo.set_params(*EO_PARAMS)
 
-    pylab.figure()
-    pylab.subplot(3, 2, 1)
-    pylab.imshow(frame, interpolation='nearest')
-    pylab.axhline(max_y, c='r', alpha=0.3)
-    pylab.axvline(max_x, c='g', alpha=0.3)
+    img = frames[0]
+    #img[img < PIX_THRESHOLD] = 0
+    f = pylab.figure()
+    X_MARGIN = 30
+    Y_MARGIN = 20
+    for r in range(TOP_N):
+        s_i = score_idx_sorted[r]
+        score = scores[s_i]
+        ax =f.add_subplot(TOP_R, TOP_C, r+1)
+        ax.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
 
-    pylab.subplot(3, 2, 3)
-    pylab.plot(frame[max_y, :], 'r')
-    pylab.plot(frame[:, max_x], 'g')
+        x = sv[s_i]['x']
+        y = sv[s_i]['y']
+        phi = sv[s_i]['phi']
+        theta = sv[s_i]['theta']
 
-    # attempt to select all pix that are outside their std dev
-    pylab.subplot(3, 2, 5)
-    pylab.imshow(frame, interpolation='nearest', cmap=pylab.cm.gray)
+        x_pix, y_pix = env.gc.real_to_image(x, y)
+
+        # now compute position of diodes
+        front_pos, back_pos = util.compute_pos(eo.length, x_pix, y_pix, 
+                                               phi, theta)
+
+        cir = pylab.Circle(front_pos, radius=EO_PARAMS[1],  ec='g', fill=False,
+                           linewidth=2)
+        ax.add_patch(cir)
+        cir = pylab.Circle(back_pos, radius=EO_PARAMS[2],  ec='r', fill=False, 
+                           linewidth=2)
+        ax.add_patch(cir)
+        # LINEWIDTH = 2
+        # ax.axhline(front_pos[1], linewidth=LINEWIDTH, c='g', alpha=0.7)
+        # ax.axvline(front_pos[0], linewidth=LINEWIDTH, c='g', alpha=0.7)
+        
+        # ax.axhline(back_pos[1], linewidth=LINEWIDTH, c='r', alpha=0.7)
+        # ax.axvline(back_pos[0], linewidth=LINEWIDTH, c='r', alpha=0.7)
+        
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlim(x_pix - X_MARGIN, x_pix+X_MARGIN)
+        ax.set_ylim(y_pix - Y_MARGIN, y_pix+Y_MARGIN)
+    f.subplots_adjust(bottom=0, left=.01, right=.99, top=.90, hspace=.1, wspace=.1)
+    f.savefig(zoom_outfile, dpi=300)
+
+
+# @files(frame_params)
+# def examine_frame((epoch_dir, epoch_config_filename, epoch_region_filename,
+#             frame_hist_filename), outfile, epoch, frame):
+#     np.random.seed(0)
     
-    pylab.gca().add_patch(pylab.Rectangle(region_lower_corner,
-                              region_upper_corner[0] - region_lower_corner[0], 
-                              region_upper_corner[1] - region_lower_corner[1], fill=False, linewidth=2, edgecolor='r'))
-    for thold_i, thold in enumerate([250, 255]):
-        #outlier_mask = frame > (frame_mean + 2*frame_std)
-        high_mask = frame >= thold
+#     cf = pickle.load(open(epoch_config_filename))
+#     framehist = np.load(frame_hist_filename)
+#     region = pickle.load(open(epoch_region_filename))
 
-        tgt_mask = high_mask # np.logical_and(high_mask, outlier_mask)
-        frame2 = frame.copy()
+#     frames = organizedata.get_frames(epoch_dir, np.array([frame]))
+#     frame = frames[0]
+#     frame_hist = framehist['hist']
+#     frame_mean = np.mean(frame_hist, axis=2)
 
-        S = 6
-        a = scipy.ndimage.binary_dilation(tgt_mask, 
-                                          structure=np.ones((S, S)))
-        frame2[np.logical_not(a)] = 0
+#     env = util.Environmentz(cf['field_dim_m'], 
+#                             cf['frame_dim_pix'])
+    
+#     region_lower_corner = env.gc.real_to_image(region['x_pos_min'], 
+#                                              region['yXb_pos_min'])
+#     region_upper_corner = env.gc.real_to_image(region['x_pos_max'], 
+#                                              region['y_pos_max'])
 
-        pylab.subplot(3, 2, 2*thold_i + 2)
-        pylab.imshow(frame2, interpolation='nearest', cmap=pylab.cm.gray)
+#     maxpoint = np.argmax(frame)
+#     max_y, max_x = np.unravel_index(maxpoint, frame.shape)
 
-    # # now look at entropy of spots
-    # ent = np.zeros((frame_hist.shape[0], frame_hist.shape[1]))
-    # for r in range(frame_hist.shape[0]):
-    #     for c in range(frame_hist.shape[1]):
-    #         v = frame_hist[r, c]
-    #         not_zeros = v > 0
-    #         p = v / np.sum(v)
+#     pylab.figure()
+#     pylab.subplot(3, 2, 1)
+#     pylab.imshow(frame, interpolation='nearest')
+#     pylab.axhline(max_y, c='r', alpha=0.3)
+#     pylab.axvline(max_x, c='g', alpha=0.3)
+
+#     pylab.subplot(3, 2, 3)
+#     pylab.plot(frame[max_y, :], 'r')
+#     pylab.plot(frame[:, max_x], 'g')
+
+#     # attempt to select all pix that are outside their std dev
+#     pylab.subplot(3, 2, 5)
+#     pylab.imshow(frame, interpolation='nearest', cmap=pylab.cm.gray)
+    
+#     pylab.gca().add_patch(pylab.Rectangle(region_lower_corner,
+#                               region_upper_corner[0] - region_lower_corner[0], 
+#                               region_upper_corner[1] - region_lower_corner[1], fill=False, linewidth=2, edgecolor='r'))
+#     for thold_i, thold in enumerate([250, 255]):
+#         #outlier_mask = frame > (frame_mean + 2*frame_std)
+#         high_mask = frame >= thold
+
+#         tgt_mask = high_mask # np.logical_and(high_mask, outlier_mask)
+#         frame2 = frame.copy()
+
+#         S = 6
+#         a = scipy.ndimage.binary_dilation(tgt_mask, 
+#                                           structure=np.ones((S, S)))
+#         frame2[np.logical_not(a)] = 0
+
+#         pylab.subplot(3, 2, 2*thold_i + 2)
+#         pylab.imshow(frame2, interpolation='nearest', cmap=pylab.cm.gray)
+
+#     # # now look at entropy of spots
+#     # ent = np.zeros((frame_hist.shape[0], frame_hist.shape[1]))
+#     # for r in range(frame_hist.shape[0]):
+#     #     for c in range(frame_hist.shape[1]):
+#     #         v = frame_hist[r, c]
+#     #         not_zeros = v > 0
+#     #         p = v / np.sum(v)
             
-    #         ent[r, c] = -np.sum(p[not_zeros] * np.log2(p[not_zeros]))
-    # pylab.subplot(3, 2, 6)
-    # pylab.imshow(ent)
-    pylab.savefig(outfile, dpi=400)
+#     #         ent[r, c] = -np.sum(p[not_zeros] * np.log2(p[not_zeros]))
+#     # pylab.subplot(3, 2, 6)
+#     # pylab.imshow(ent)
+#     pylab.savefig(outfile, dpi=400)
 
 # Def params_rendered():
 #     for p in params():
@@ -298,5 +379,72 @@ def examine_frame((epoch_dir, epoch_config_filename, epoch_region_filename,
 
 #     pylab.savefig(plot_filename)
 
+def create_state_vect(y_range, x_range, phi_range, theta_range):
+    N = len(y_range) * len(x_range) * len(phi_range) * len(theta_range)
 
-pipeline_run([plot_likelihood], multiprocess=4)
+    state = np.zeros(N, dtype=util.DTYPE_STATE)
+    
+    i = 0
+    for yi, y in enumerate(y_range):
+        for xi, x in enumerate(x_range):
+            for phii, phi in enumerate(phi_range):
+                for thetai, theta in enumerate(theta_range):
+                    state['x'][i] = x
+                    state['y'][i] = y
+                    state['phi'][i] = phi
+                    state['theta'][i] = theta
+                    i += 1
+    return state
+
+def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
+                        state_idx, frame):
+    """
+    pi-cloud runner, every instance builds up full state, but
+    we only evaluate the states in [state_idx_to_eval[0], state_idx_to_eval[1])
+    and return scores
+    """
+    print "DATSET_NAME=", dataset_name
+    dataset_dir = os.path.join(FL_DATA, dataset_name)
+    dataset_config_filename = os.path.join(dataset_dir, "config.pickle")
+    dataset_region_filename = os.path.join(dataset_dir, "region.pickle")
+    frame_hist_filename = os.path.join(dataset_dir, "framehist.npz")
+    
+    np.random.seed(0)
+    
+    cf = pickle.load(open(dataset_config_filename))
+    region = pickle.load(open(dataset_region_filename))
+
+    framehist = np.load(frame_hist_filename)
+    
+    env = util.Environmentz(cf['field_dim_m'], 
+                            cf['frame_dim_pix'])
+
+    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
+    eo.set_params(*EO_PARAMS)
+    
+    le = likelihood.LikelihoodEvaluator(env, eo)
+
+    frames = organizedata.get_frames(dataset_dir, np.array([frame]))
+    frame = frames[0]
+    frame[frame < PIX_THRESHOLD] = 0
+    # create the state vector
+
+    state = create_state_vect(y_range, x_range, phi_range, theta_range)
+    
+    SCORE_N = state_idx[1] - state_idx[0]
+    scores = np.zeros(SCORE_N, dtype=np.float32)
+    for i, state_i in enumerate(state[state_idx[0]:state_idx[1]]):
+        x = state_i['x']
+        y = state_i['y']
+        if region['x_pos_min'] <= x <= region['x_pos_max'] and \
+                region['y_pos_min'] <= y <= region['y_pos_max']:
+        
+            score = le.score_state(state_i, frames)
+            scores[i] = score
+        else:
+            scores[i] = -1e100
+    return scores
+
+if __name__ == "__main__":
+    pipeline_run([score_frame_wait, plot_likelihood, 
+                  plot_likelihood_zoom], multiprocess=4)

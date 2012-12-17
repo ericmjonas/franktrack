@@ -1,55 +1,49 @@
 import numpy as np
-import cPickle as pickle
 import os
-import util2 as util
-import measure
-import methods
-import organizedata
-import subprocess
-from ruffus import * 
+import cPickle as pickle
 
-import random
+import bruteforcelikelihood as bfl
 import cloud
 
+#cloud.start_simulator()
 
-total_tests = 50000000
+dataset_name = "bukowski_04.W2"
+dataset_dir = os.path.join(bfl.FL_DATA, dataset_name)
+dataset_config_filename = os.path.join(dataset_dir, "config.pickle")
+frame_hist_filename = os.path.join(dataset_dir, "framehist.npz")
 
-def monteCarlo(num_test):
-  """
-  Throw num_test darts at a square
-  Return how many appear within the quarter circle
-  """
-  num_in_circle = 0
-  for _ in xrange(num_test):
-    x = random.random()
-    y = random.random()
-    if x*x + y*y < 1.0:  #within the quarter circle
-      num_in_circle += 1
-  return num_in_circle
+cf = pickle.load(open(dataset_config_filename))
 
-def calcPi():
-  num_jobs = 8
-  tests_per_call = total_tests/num_jobs
-  jids = cloud.map(monteCarlo,[tests_per_call]*num_jobs, _type='c2')  #argument list has 8 duplicate elements
-  num_in_circle_list = cloud.result(jids) #get list of counts
-  num_in_circle = sum(num_in_circle_list)   #add the list together
-  pi = (4 * num_in_circle) / float(total_tests)
-  return pi
 
-def files(dirname):
-    p = subprocess.Popen("find data/ | wc -l ", shell=True, 
-                         stdout=subprocess.PIPE)
-    s = p.stdout.read()
-    p.wait()
-    return s
+x_range = np.linspace(0, cf['field_dim_m'][1], 200)
+y_range = np.linspace(0, cf['field_dim_m'][0], 200)
+phi_range = np.linspace(0, 2*np.pi, 16)
+theta_range = np.array([np.pi/2.])
 
-def cloud_files():
-    jids = cloud.map(files, ['none'], _type='c2', 
-                     _vol="my-vol")
-    return cloud.result(jids)[0]
+sv = bfl.create_state_vect(y_range, x_range, phi_range, theta_range)
 
-if __name__ == '__main__':
-    #pi = calcPi()
-    #print 'Pi determined to be %s' % pi
-    print "files=", files('none')
-    print "cloud files=", cloud_files()
+# now the input args
+chunk_size = 10000
+chunks = int(np.ceil(len(sv) / float(chunk_size)))
+frames = np.arange(10)*50
+
+args = []
+for i in range(chunks):
+    args += [  (i*chunk_size, (i+1)*chunk_size)]*len(frames)
+               
+
+print "THERE ARE", chunks, "CHUNKS"
+
+
+CN = chunks
+results = []
+for fi, frame in enumerate(frames):
+    jids = cloud.map(bfl.picloud_score_frame, [dataset_name]*CN,
+                     [x_range]*CN, [y_range]*CN, 
+                     [phi_range]*CN, [theta_range]*CN, 
+                     args, [frame]*CN,  
+                     _type='f2', _vol="my-vol", _env="base/precise")
+    results.append(jids)
+
+# get the results
+[cloud.result(jids) for jids in results]

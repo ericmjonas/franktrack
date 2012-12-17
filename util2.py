@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats
+import os
 
 """
 UNITS: 
@@ -11,6 +12,15 @@ we use a right-handed coordinate frame at all times, where the animal
 is assumed to be moving in the x-y plane 
 
 """
+
+DATA_DIR = "data/fl"
+def ddir(x):
+    return os.path.join(DATA_DIR, x)
+
+REPORT_DIR = "results"
+def rdir(x):
+    return os.path.join(REPORT_DIR, x)
+
 
 DTYPE_STATE = [('x', np.float32), 
                ('y', np.float32), 
