@@ -351,9 +351,91 @@ def entropy_vs_pos(positions_file, (pix_entropypix,)):
     pylab.ylabel('fraction error')
     pylab.savefig(hard_tracking_region, dpi=300)
 
+
+@transform(os.path.join(DATA_DIR, "*/positions.npy"), 
+           regex(r".+/(.+)/positions.npy$"), 
+           [
+            os.path.join(DATA_DIR, r"\1", "led.params.pickle")]
+            )
+def measure_diode_params(positions_file, (
+                                          led_params)):
+    positions = np.load(positions_file)
+    basedir = os.path.dirname(positions_file)
+    cf = pickle.load(open(os.path.join(basedir, "config.pickle")))
+    env = util.Environmentz(cf['field_dim_m'], 
+                            cf['frame_dim_pix'])
+
+
+    invalid_sep = detect_invalid_sep(positions)
+    positions_cleaned = positions.copy()
+    positions_cleaned[invalid_sep] = ((np.nan, np.nan), 
+                                      (np.nan, np.nan), np.nan, np.nan)
+    
+    # just take the sanitized data, don't bother interpolating. 
+    # ignore all other positions
+    valid_frames = np.argwhere(np.isfinite(positions_cleaned['x']))[:-3, 0]
+    # the -3 above is to deal with some strange offset issues we have where len(positions) != total-number-of-frames
+
+
+    PIX_REGION = 24 # num pixels on either side
+    ledimgs = np.zeros((len(valid_frames), 2, PIX_REGION*2+1, 
+                        PIX_REGION*2+1), dtype = np.uint8)
+    
+    framepos = 0
+    for frame_chunk in util.chunk(valid_frames, 100):
+        frames = organizedata.get_frames(basedir, frame_chunk)
+        
+        for frame_idx, frame in zip(frame_chunk, frames):
+            for led, field in [(0, 'led_front'), 
+                               (1, 'led_back')]:
+                real_pos = positions_cleaned[field][frame_idx]
+                x, y = env.gc.real_to_image(real_pos[0], real_pos[1])
+
+                ledimgs[framepos, led, :, :] = util.extract_region_safe(frame, int(y), int(x), PIX_REGION, 0)
+                    
+            framepos +=1
+    ledimgs_mean = np.mean(ledimgs.astype(np.float32), 
+                      axis=0)
+    
+    led_params_dict = {'ledimgs_mean' : ledimgs_mean, 
+                       'dist' : compute_led_sep(positions[valid_frames])}
+    pickle.dump(led_params_dict, open(led_params, 'w'))
+
+@follows(measure_diode_params)    
+@transform(os.path.join(DATA_DIR, "*/led.params.pickle"), 
+           regex(r".+/(.+)/led.params.pickle$"), 
+           [os.path.join(REPORT_DIR, 
+                         r"\1.led.params.png")]
+            )
+def plot_diode_params(led_params_pickle, (params_png, )):
+    led_params = pickle.load(open(led_params_pickle, 'r'))
+
+    ledimgs_mean = led_params['ledimgs_mean']
+    S = ledimgs_mean[0].shape[0]
+    pylab.figure()
+    for i in range(2):
+        ax = pylab.subplot2grid((3, 2), (i, 0))
+        ax.imshow(ledimgs_mean[i], interpolation='nearest', 
+                  cmap=pylab.cm.gray, vmin = 0, vmax=255)
+        ax.axhline(S/2+1, c='b')
+        ax.axvline(S/2+1, c='r')
+        ax.grid(1)
+
+        axl = pylab.subplot2grid((3, 2), (i, 1))
+        axl.plot(ledimgs_mean[i, S/2+1, :], c='b')
+        axl.plot(ledimgs_mean[i, :, S/2+1], c='r')
+        axl.grid(1)
+
+        # now the histogram
+    axh = pylab.subplot2grid((3, 2), (2, 1), colspan=2)
+    axh.hist(led_params['dist'], bins=20)
+        
+    pylab.savefig(params_png, dpi=300)
+
 if __name__ == "__main__":
-    pipeline_run([agg_stats, sanity_check, difficult_regions], 
-                 multiprocess=4)
+    pipeline_run([agg_stats, sanity_check, difficult_regions,
+                  measure_diode_params, plot_diode_params])
+    #multiprocess=4)
     
     
     

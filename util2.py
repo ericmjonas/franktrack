@@ -166,3 +166,37 @@ def chunk(l, n):
     """
     for i in xrange(0, len(l), n):
         yield l[i:i+n]
+
+    
+def extract_region_safe(a, r, c, n, defaultval = 0):
+    """
+    Extract the region centered at r, c with n pixels
+    on each side, appropriately centered in the output array
+    """
+    
+    region = np.zeros((n*2+1, n*2+1), dtype=a.dtype)
+    region[:, :] = defaultval
+    
+    R, C = a.shape
+    
+    pix_left = min(c-n, n)
+    if pix_left < 0: pix_left = 0
+
+    pix_right = min(C - c -1, n)
+    
+    pix_top = min(r, n)
+    pix_bot = min(R - r - 1, n)
+
+    roi = a[r - pix_top:r+pix_bot+1, 
+            c - pix_left:c + pix_right+1]
+
+    try:
+        region[(n - pix_top) : (n + pix_bot+ 1),
+               (n - pix_left) : (n + pix_right + 1)] = roi
+    except ValueError:
+        s = "a.shape=(%d %d),  %d %d %d %d, %s, %d, %d" % (R, C, pix_left, pix_right, pix_top, pix_bot, roi.shape, r, c)
+        raise Exception(s)
+
+    return region
+
+    
