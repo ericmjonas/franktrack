@@ -17,17 +17,18 @@ import os
 import organizedata
 import videotools
 import glob
+import measure
 
 from ruffus import * 
 import pf
 
 PIX_THRESHOLD = 200
 FL_DATA = "data/fl"
-EO_PARAMS = (14, 4, 2)
+
 def params():
-    EPOCHS = ['bukowski_04.W2', 'bukowski_04.C']# , 'bukowski_04.W2', 
+    EPOCHS = ['bukowski_04.W2', 'bukowski_04.C', 'bukowski_04.linear']# , 'bukowski_04.W2', 
     #'bukowski_04.C', 'bukowski_04.linear']
-    FRAMES = np.arange(50)*200
+    FRAMES = np.arange(10)*1000
     
     for epoch in EPOCHS:
         for frame in FRAMES:
@@ -41,23 +42,23 @@ def params():
             
             yield (infiles, outfiles, epoch, frame)
            
-def frame_params():
-    EPOCHS = [os.path.split(f)[1] for f in glob.glob(FL_DATA + "/*")]
-    FRAMES = np.arange(10)*50
+# def frame_params():
+#     EPOCHS = [os.path.split(f)[1] for f in glob.glob(FL_DATA + "/*")]
+#     FRAMES = np.arange(10)*50
     
-    for epoch in EPOCHS:
-        for frame_pos in FRAMES:
-            for f in range(3):
-                frame = frame_pos + f
-                infile = [os.path.join(FL_DATA, epoch), 
-                          os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                          os.path.join(FL_DATA, epoch, 'region.pickle'), 
-                          os.path.join(FL_DATA, epoch, 'framehist.npz'), 
-                          ]
+#     for epoch in EPOCHS:
+#         for frame_pos in FRAMES:
+#             for f in range(3):
+#                 frame = frame_pos + f
+#                 infile = [os.path.join(FL_DATA, epoch), 
+#                           os.path.join(FL_DATA, epoch, 'config.pickle'), 
+#                           os.path.join(FL_DATA, epoch, 'region.pickle'), 
+#                           os.path.join(FL_DATA, epoch, 'framehist.npz'), 
+#                           ]
 
-                outfile = '%s.likelihoodscores.%05d.pdf' % (epoch, frame)
+#                 outfile = '%s.likelihoodscores.%05d.pdf' % (epoch, frame)
 
-                yield (infile, outfile, epoch, frame)
+#                 yield (infile, outfile, epoch, frame)
 
 @files(params)
 def score_frame_queue((dataset_dir, dataset_config_filename, 
@@ -69,12 +70,14 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
     dataset_dir = os.path.join(FL_DATA, dataset_name)
 
     cf = pickle.load(open(dataset_config_filename))
+    led_params = pickle.load(open(os.path.join(dataset_dir, "led.params.pickle")))
 
+    EO = measure.led_params_to_EO(cf, led_params)
 
-    x_range = np.linspace(0, cf['field_dim_m'][1], 240)
-    y_range = np.linspace(0, cf['field_dim_m'][0], 240)
-    phi_range = np.linspace(0, 2*np.pi, 32)
-    degrees_from_vertical = 45 
+    x_range = np.linspace(0, cf['field_dim_m'][1], 200)
+    y_range = np.linspace(0, cf['field_dim_m'][0], 200)
+    phi_range = np.linspace(0, 2*np.pi, 20)
+    degrees_from_vertical = 30
     radian_range = degrees_from_vertical/180. * np.pi
     theta_range = np.linspace(np.pi/2.-radian_range, 
                               np.pi/2. + radian_range, 12)
@@ -91,11 +94,11 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
 
     CN = chunks
     results = []
-
+    print "MAPPING TO THE CLOUD" 
     jids = cloud.map(picloud_score_frame, [dataset_name]*CN,
                      [x_range]*CN, [y_range]*CN, 
                      [phi_range]*CN, [theta_range]*CN, 
-                     args, [frame]*CN,  
+                     args, [frame]*CN,  [EO]*CN, 
                      _type='f2', _vol="my-vol", _env="base/precise")
 
     np.savez_compressed(outfile_npz, 
@@ -203,6 +206,11 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
     eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
+    led_params = pickle.load(open(os.path.join(data_p['dataset_dir'], 
+                                               "led.params.pickle")))
+
+    EO_PARAMS = measure.led_params_to_EO(cf, led_params)
+
     eo.set_params(*EO_PARAMS)
 
     img = frames[0]
@@ -397,7 +405,7 @@ def create_state_vect(y_range, x_range, phi_range, theta_range):
     return state
 
 def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
-                        state_idx, frame):
+                        state_idx, frame, EO_PARAMS):
     """
     pi-cloud runner, every instance builds up full state, but
     we only evaluate the states in [state_idx_to_eval[0], state_idx_to_eval[1])

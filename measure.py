@@ -357,8 +357,7 @@ def entropy_vs_pos(positions_file, (pix_entropypix,)):
            [
             os.path.join(DATA_DIR, r"\1", "led.params.pickle")]
             )
-def measure_diode_params(positions_file, (
-                                          led_params)):
+def measure_diode_params(positions_file, (led_params,)):
     positions = np.load(positions_file)
     basedir = os.path.dirname(positions_file)
     cf = pickle.load(open(os.path.join(basedir, "config.pickle")))
@@ -396,21 +395,69 @@ def measure_diode_params(positions_file, (
             framepos +=1
     ledimgs_mean = np.mean(ledimgs.astype(np.float32), 
                       axis=0)
+    subsamp = 60
     
     led_params_dict = {'ledimgs_mean' : ledimgs_mean, 
-                       'dist' : compute_led_sep(positions[valid_frames])}
+                       'dist' : compute_led_sep(positions[valid_frames]), 
+                       'subsampled_frames' : ledimgs[::subsamp]}
     pickle.dump(led_params_dict, open(led_params, 'w'))
+
+def led_measure(img_row):
+    
+    import scipy.stats
+    midval = (np.max(img_row) - np.min(img_row)) / 2.0 + np.min(img_row)
+    aw = np.argwhere(img_row > midval)[:]
+    width = aw[-1] - aw[1]
+
+    N = len(img_row)
+    mu = N / 2
+    sigma = width/2.0
+
+    x = np.linspace(0, N, 100)
+    a = scipy.stats.norm.pdf(x, mu, sigma)
+    a = a * np.max(img_row)/np.max(a)
+    
+    
+    return sigma, a, x
+
+def led_params_to_EO(cf, led_params):
+    """ Returns "EO" tuple of (led_dist_in_pix, front_led_radius, back_led_radius"""
+    
+    env = util.Environmentz(cf['field_dim_m'], 
+                            cf['frame_dim_pix'])
+    
+    ledimgs_mean = led_params['ledimgs_mean']
+
+    S = ledimgs_mean[0].shape[0]
+
+    # in both cases taking the horizontal one
+    sigma_front_h, a, a_x = led_measure(ledimgs_mean[0, S/2+1, :])
+    sigma_back_h, a, a_x = led_measure(ledimgs_mean[1, S/2+1, :])
+
+    sigma_front_v, a, a_x = led_measure(ledimgs_mean[0, :, S/2+1])
+    sigma_back_v, a, a_x = led_measure(ledimgs_mean[1, :, S/2+1])
+
+    w_front = (sigma_front_h + sigma_front_v)/2.
+    w_back = (sigma_back_h + sigma_back_v)/2.
+    
+    dist_in_m = np.mean(led_params['dist'])
+    dist_in_pix = int(dist_in_m * env.gc.pix_per_meter[0])
+    return (dist_in_pix, int(w_front), int(w_back))
 
 @follows(measure_diode_params)    
 @transform(os.path.join(DATA_DIR, "*/led.params.pickle"), 
            regex(r".+/(.+)/led.params.pickle$"), 
            [os.path.join(REPORT_DIR, 
-                         r"\1.led.params.png")]
+                         r"\1.led.params.png"), 
+            os.path.join(REPORT_DIR, 
+                         r"\1.led.examples.png"), 
+            ]
             )
-def plot_diode_params(led_params_pickle, (params_png, )):
+def plot_diode_params(led_params_pickle, (params_png, examples_png)):
     led_params = pickle.load(open(led_params_pickle, 'r'))
 
     ledimgs_mean = led_params['ledimgs_mean']
+    subsampled_frames = led_params['subsampled_frames']
     S = ledimgs_mean[0].shape[0]
     pylab.figure()
     for i in range(2):
@@ -423,7 +470,11 @@ def plot_diode_params(led_params_pickle, (params_png, )):
 
         axl = pylab.subplot2grid((3, 2), (i, 1))
         axl.plot(ledimgs_mean[i, S/2+1, :], c='b')
+        sigma, a, a_x = led_measure(ledimgs_mean[i, S/2+1, :])
+        axl.plot(a_x, a, c='b', linestyle='--')
         axl.plot(ledimgs_mean[i, :, S/2+1], c='r')
+        sigma, a, a_x = led_measure(ledimgs_mean[i, :, S/2+1])
+        axl.plot(a_x, a, c='r', linestyle='--')
         axl.grid(1)
 
         # now the histogram
@@ -432,9 +483,37 @@ def plot_diode_params(led_params_pickle, (params_png, )):
         
     pylab.savefig(params_png, dpi=300)
 
+    pylab.figure()
+    for i in range(2):
+        ax = pylab.subplot2grid((4, 8), (i*2, 0), colspan=2, rowspan=2)
+        ax.imshow(ledimgs_mean[i], interpolation='nearest', 
+                  cmap=pylab.cm.gray, vmin = 0, vmax=255)
+        ax.axhline(S/2+1, c='b')
+        ax.axvline(S/2+1, c='r')
+        ax.grid(1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        # now the N examples
+        fpos = 0
+        for c in range(2, 8):
+            for r in range(i*2, i*2 + 2):
+                ax = pylab.subplot2grid((4, 8), (r, c))
+                ax.imshow(subsampled_frames[fpos, i, :, :], 
+                          interpolation='nearest', 
+                          cmap=pylab.cm.gray, vmin=0, vmax=255)
+                ax.grid(1)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                fpos += 1
+
+
+    pylab.savefig(examples_png, dpi=300)
+
 if __name__ == "__main__":
     pipeline_run([agg_stats, sanity_check, difficult_regions,
-                  measure_diode_params, plot_diode_params])
+                  measure_diode_params, plot_diode_params],
+                  multiprocess=4)
     #multiprocess=4)
     
     
