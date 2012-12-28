@@ -25,10 +25,12 @@ import pf
 PIX_THRESHOLD = 200
 FL_DATA = "data/fl"
 
+#cloud.start_simulator()
+
 def params():
-    EPOCHS = ['bukowski_04.W2', 'bukowski_04.C', 'bukowski_04.linear']# , 'bukowski_04.W2', 
+    EPOCHS = ['bukowski_04.W2']# , 'bukowski_04.W2', 
     #'bukowski_04.C', 'bukowski_04.linear']
-    FRAMES = np.arange(10)*1000
+    FRAMES = np.arange(10)*100
     
     for epoch in EPOCHS:
         for frame in FRAMES:
@@ -77,7 +79,7 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
     x_range = np.linspace(0, cf['field_dim_m'][1], 200)
     y_range = np.linspace(0, cf['field_dim_m'][0], 200)
     phi_range = np.linspace(0, 2*np.pi, 20)
-    degrees_from_vertical = 30
+    degrees_from_vertical = 45
     radian_range = degrees_from_vertical/180. * np.pi
     theta_range = np.linspace(np.pi/2.-radian_range, 
                               np.pi/2. + radian_range, 12)
