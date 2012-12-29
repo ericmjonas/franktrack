@@ -22,7 +22,7 @@ import measure
 from ruffus import * 
 import pf
 
-PIX_THRESHOLD = 220
+PIX_THRESHOLD = 200
 FL_DATA = "data/fl"
 
 #cloud.start_simulator()
@@ -218,7 +218,7 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
     img = frames[0]
     img_thold = img.copy()
     img_thold[img < PIX_THRESHOLD] = 0
-    f = pylab.figure()
+    f = pylab.figure(figsize=(12, 8))
     X_MARGIN = 30
     Y_MARGIN = 20
     for row in range(TOP_R):
@@ -226,19 +226,27 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
             r = row * TOP_C + col
             s_i = score_idx_sorted[r]
             score = scores[s_i]
-            ax = pylab.subplot2grid((TOP_R *2, TOP_C), (row*2, col))
+            ax = pylab.subplot2grid((TOP_R *2, TOP_C*2), (row*2, col*2))
             ax.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
-            ax_thold = pylab.subplot2grid((TOP_R*2, TOP_C), 
-                                      (row*2+1, col))
+            ax_thold = pylab.subplot2grid((TOP_R*2, TOP_C*2), 
+                                      (row*2+1, col*2))
             ax_thold.imshow(img_thold, interpolation='nearest', 
-                            cmap=pylab.cm.gray)
+                            cmap=pylab.cm.gray, 
+                            vmin=0, vmax=255)
             x = sv[s_i]['x']
             y = sv[s_i]['y']
             phi = sv[s_i]['phi']
             theta = sv[s_i]['theta']
-
             x_pix, y_pix = env.gc.real_to_image(x, y)
 
+            # render the fake image
+            ax_generated = pylab.subplot2grid((TOP_R*2, TOP_C*2), 
+                                      (row*2+1, col*2 + 1))
+            rendered_img = eo.render_source(x_pix, y_pix, 
+                                            phi, theta)
+            ax_generated.imshow(rendered_img*255, interpolation='nearest', 
+                                cmap=pylab.cm.gray, 
+                                vmin = 0, vmax=255)
             # now compute position of diodes
             front_pos, back_pos = util.compute_pos(eo.length, x_pix, y_pix, 
                                                    phi, theta)
@@ -249,12 +257,13 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
             cir = pylab.Circle(back_pos, radius=EO_PARAMS[2],  ec='r', fill=False, 
                                linewidth=2)
             ax.add_patch(cir)
-            for a in [ax, ax_thold]:
+            ax.set_title("%2.2f, %2.2f, %1.1f, %1.1f, %4.2f" % (x, y, phi, theta, score), size="xx-small")
+            for a in [ax, ax_thold, ax_generated]:
                 a.set_xticks([])
                 a.set_yticks([])
                 a.set_xlim(x_pix - X_MARGIN, x_pix+X_MARGIN)
                 a.set_ylim(y_pix - Y_MARGIN, y_pix+Y_MARGIN)
-    f.subplots_adjust(bottom=0, left=.01, right=.99, top=.90, hspace=.1, wspace=.1)
+    f.subplots_adjust(bottom=0, left=.01, right=.99, top=.90, hspace=.2, wspace=.1)
     f.savefig(zoom_outfile, dpi=300)
 
 

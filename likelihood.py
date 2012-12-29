@@ -147,7 +147,6 @@ class LikelihoodEvaluator(object):
         x = state['x']
         y = state['y']
 
-
         theta = state['theta']
         phi = state['phi']
         x_pix, y_pix = self.env.gc.real_to_image(x, y)
@@ -162,34 +161,34 @@ class LikelihoodEvaluator(object):
         return s
 
 
-    def score_state_subregion(self, state, img):
-        """
-        only score the most interesting area
-        """
-        x = state['x']
-        y = state['y']
+    # def score_state_subregion(self, state, img):
+    #     """
+    #     only score the most interesting area
+    #     """
+    #     x = state['x']
+    #     y = state['y']
 
 
-        theta = state['theta']
-        phi = state['phi']
-        x_pix, y_pix = self.env.gc.real_to_image(x, y)
+    #     theta = state['theta']
+    #     phi = state['phi']
+    #     x_pix, y_pix = self.env.gc.real_to_image(x, y)
 
-        proposed_img, rr = self.evaluate_obj.render_source(x_pix, y_pix,
-                                                           phi, theta)
-        rr_x = rr.get_x_bounded()
-        rr_y = rr.get_y_bounded()
-        proposed_img = proposed_img[rr_y[0]:rr_y[1], 
-                                    rr_x[0]:rr_x[1]]
+    #     proposed_img, rr = self.evaluate_obj.render_source(x_pix, y_pix,
+    #                                                        phi, theta)
+    #     rr_x = rr.get_x_bounded()
+    #     rr_y = rr.get_y_bounded()
+    #     proposed_img = proposed_img[rr_y[0]:rr_y[1], 
+    #                                 rr_x[0]:rr_x[1]]
 
-        pi_pix = proposed_img*255
-        img = img[rr_y[0]:rr_y[1], 
-                  rr_x[0]:rr_x[1]]
-        if similarity == 'absdif':
-            delta = (pi_pix - img.astype(np.float32))
-            s = - np.sum(np.abs(delta))
-        else:
-            pass
-        return s
+    #     pi_pix = proposed_img*255
+    #     img = img[rr_y[0]:rr_y[1], 
+    #               rr_x[0]:rr_x[1]]
+    #     if similarity == 'absdif':
+    #         delta = (pi_pix - img.astype(np.float32))
+    #         s = - np.sum(np.abs(delta))
+    #     else:
+    #         pass
+    #     return s
 
 class DiodeGeom(object):
     def __init__(self, length, front_radius, back_radius):
