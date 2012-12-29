@@ -22,7 +22,7 @@ import measure
 from ruffus import * 
 import pf
 
-PIX_THRESHOLD = 200
+PIX_THRESHOLD = 220
 FL_DATA = "data/fl"
 
 #cloud.start_simulator()
@@ -76,13 +76,13 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
 
     EO = measure.led_params_to_EO(cf, led_params)
 
-    x_range = np.linspace(0, cf['field_dim_m'][1], 200)
-    y_range = np.linspace(0, cf['field_dim_m'][0], 200)
+    x_range = np.linspace(0, cf['field_dim_m'][1], 150)
+    y_range = np.linspace(0, cf['field_dim_m'][0], 150)
     phi_range = np.linspace(0, 2*np.pi, 20)
-    degrees_from_vertical = 45
+    degrees_from_vertical = 30
     radian_range = degrees_from_vertical/180. * np.pi
     theta_range = np.linspace(np.pi/2.-radian_range, 
-                              np.pi/2. + radian_range, 12)
+                              np.pi/2. + radian_range, 6)
 
     sv = create_state_vect(y_range, x_range, phi_range, theta_range)
 
@@ -216,44 +216,44 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
     eo.set_params(*EO_PARAMS)
 
     img = frames[0]
-    #img[img < PIX_THRESHOLD] = 0
+    img_thold = img.copy()
+    img_thold[img < PIX_THRESHOLD] = 0
     f = pylab.figure()
     X_MARGIN = 30
     Y_MARGIN = 20
-    for r in range(TOP_N):
-        s_i = score_idx_sorted[r]
-        score = scores[s_i]
-        ax =f.add_subplot(TOP_R, TOP_C, r+1)
-        ax.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+    for row in range(TOP_R):
+        for col in range(TOP_C):
+            r = row * TOP_C + col
+            s_i = score_idx_sorted[r]
+            score = scores[s_i]
+            ax = pylab.subplot2grid((TOP_R *2, TOP_C), (row*2, col))
+            ax.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+            ax_thold = pylab.subplot2grid((TOP_R*2, TOP_C), 
+                                      (row*2+1, col))
+            ax_thold.imshow(img_thold, interpolation='nearest', 
+                            cmap=pylab.cm.gray)
+            x = sv[s_i]['x']
+            y = sv[s_i]['y']
+            phi = sv[s_i]['phi']
+            theta = sv[s_i]['theta']
 
-        x = sv[s_i]['x']
-        y = sv[s_i]['y']
-        phi = sv[s_i]['phi']
-        theta = sv[s_i]['theta']
+            x_pix, y_pix = env.gc.real_to_image(x, y)
 
-        x_pix, y_pix = env.gc.real_to_image(x, y)
+            # now compute position of diodes
+            front_pos, back_pos = util.compute_pos(eo.length, x_pix, y_pix, 
+                                                   phi, theta)
 
-        # now compute position of diodes
-        front_pos, back_pos = util.compute_pos(eo.length, x_pix, y_pix, 
-                                               phi, theta)
-
-        cir = pylab.Circle(front_pos, radius=EO_PARAMS[1],  ec='g', fill=False,
-                           linewidth=2)
-        ax.add_patch(cir)
-        cir = pylab.Circle(back_pos, radius=EO_PARAMS[2],  ec='r', fill=False, 
-                           linewidth=2)
-        ax.add_patch(cir)
-        # LINEWIDTH = 2
-        # ax.axhline(front_pos[1], linewidth=LINEWIDTH, c='g', alpha=0.7)
-        # ax.axvline(front_pos[0], linewidth=LINEWIDTH, c='g', alpha=0.7)
-        
-        # ax.axhline(back_pos[1], linewidth=LINEWIDTH, c='r', alpha=0.7)
-        # ax.axvline(back_pos[0], linewidth=LINEWIDTH, c='r', alpha=0.7)
-        
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xlim(x_pix - X_MARGIN, x_pix+X_MARGIN)
-        ax.set_ylim(y_pix - Y_MARGIN, y_pix+Y_MARGIN)
+            cir = pylab.Circle(front_pos, radius=EO_PARAMS[1],  ec='g', fill=False,
+                               linewidth=2)
+            ax.add_patch(cir)
+            cir = pylab.Circle(back_pos, radius=EO_PARAMS[2],  ec='r', fill=False, 
+                               linewidth=2)
+            ax.add_patch(cir)
+            for a in [ax, ax_thold]:
+                a.set_xticks([])
+                a.set_yticks([])
+                a.set_xlim(x_pix - X_MARGIN, x_pix+X_MARGIN)
+                a.set_ylim(y_pix - Y_MARGIN, y_pix+Y_MARGIN)
     f.subplots_adjust(bottom=0, left=.01, right=.99, top=.90, hspace=.1, wspace=.1)
     f.savefig(zoom_outfile, dpi=300)
 
