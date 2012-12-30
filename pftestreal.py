@@ -22,24 +22,24 @@ PIX_THRESHOLD = 200
 FL_DATA = "data/fl"
 def params():
     PARTICLEN = 1000
-    FRAMEN = 10000
+    FRAMEN = 5000
     EPOCHS = ['bukowski_04.W2']
     epoch = EPOCHS[0]
-    posnoise = 0.05
-    velnoise = 0.05
+    for posnoise in [0.01]:
+        for velnoise in [0.001, 0.01]:
             
-    infile = [os.path.join(FL_DATA, epoch), 
-              os.path.join(FL_DATA, epoch, 'config.pickle'), 
-              os.path.join(FL_DATA, epoch, 'region.pickle'), 
-              os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
-              ]
+            infile = [os.path.join(FL_DATA, epoch), 
+                      os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                      os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                      os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
+                      ]
 
-    outfile = 'particles.%s.%f.%f.%d.%d.npz' % (epoch, posnoise, 
-                                                   velnoise, 
-                                                   PARTICLEN, FRAMEN)
-                                                   
-                
-    yield (infile, outfile, epoch, posnoise, velnoise, PARTICLEN, FRAMEN)
+            outfile = 'particles.%s.%f.%f.%d.%d.npz' % (epoch, posnoise, 
+                                                           velnoise, 
+                                                           PARTICLEN, FRAMEN)
+
+
+            yield (infile, outfile, epoch, posnoise, velnoise, PARTICLEN, FRAMEN)
            
 
 @files(params)
@@ -93,17 +93,18 @@ def pf_run((epoch_dir, epoch_config_filename,
 
 def params_rendered():
     for p in params():
-         yield ((p[0][0], p[0][1], p[1]), p[1] + ".pdf")
+         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".png", 
+                                           p[1] + ".xy.png"))
 
 @follows(pf_run)
 @files(params_rendered)
 def pf_plot((epoch_dir, epoch_config_filename, particles_file), 
-            plot_filename):
+            (all_plot_filename, just_xy_filename)):
     
     T_DELTA = 1/30.
     
     a = np.load(particles_file)
-    FRAMES = 2800
+    FRAMES = 100000000
     weights = a['weights'][:FRAMES]
     particles = a['particles'][:FRAMES]
     N = len(particles)
@@ -120,7 +121,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     for v in STATEVARS:
         vals[v] = np.array(vals[v])
 
-    pylab.figure()
+    pylab.figure(figsize=(8, 10))
     for vi, v in enumerate(STATEVARS):
         v_bar = np.average(vals[v], axis=1, weights=weights)
         x = np.arange(0, len(v_bar))
@@ -128,17 +129,18 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         for ci, (p, w) in enumerate(zip(vals[v], weights)):
             cred[ci] = util.credible_interval(p, w)
 
-        pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
+        ax = pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
 
-        pylab.plot(x, v_bar, color='b')
-        pylab.fill_between(x, cred[:, 0],
+        ax.plot(x, v_bar, color='b')
+        ax.fill_between(x, cred[:, 0],
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
         if v in ['x', 'y']:
-            pylab.scatter(np.arange(N), truth[v][:N], 
-                          linewidth=0, s=2)
-        pylab.grid(1)
-        
+            ax.scatter(np.arange(N), truth[v][:N], 
+                          linewidth=0, s=1, c='k')
+        ax.grid(1)
+        ax.set_xlim((0, N))
+
     pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
     # now plot the # of particles consuming 95% of the prob mass
     real_particle_num = []
@@ -151,7 +153,32 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     pylab.plot(real_particle_num)
 
-    pylab.savefig(plot_filename)
+    pylab.savefig(all_plot_filename, dpi=400)
 
+    f2 = pylab.figure(figsize=(16, 8))
+    for vi, v in enumerate(['x', 'y']):
+        v_bar = np.average(vals[v], axis=1, weights=weights)
+        x = np.arange(0, len(v_bar))
+        cred = np.zeros((len(x), 2), dtype=np.float)
+        for ci, (p, w) in enumerate(zip(vals[v], weights)):
+            cred[ci] = util.credible_interval(p, w)
 
+        ax = pylab.subplot(2, 1, vi+1)
+
+        ax.plot(x, v_bar, color='b')
+        ax.fill_between(x, cred[:, 0],
+                           cred[:, 1], facecolor='b', 
+                           alpha=0.4)
+        ax.scatter(np.arange(N), truth[v][:N], 
+                   linewidth=0, s=1, c='k')
+        for i in np.argwhere(np.isnan(truth[v][:N])):
+            ax.axvline(i, c='r')
+
+        ax.grid(1)
+        ax.set_xlim((0, N))
+        
+    pylab.savefig(just_xy_filename, dpi=300)
+                         
+                       
+    
 pipeline_run([pf_run, pf_plot], multiprocess=6)
