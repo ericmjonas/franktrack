@@ -77,14 +77,19 @@ class EvaluateObj(object):
         pix_max = max(front_size, back_size) * 2
         self.pre_img = np.zeros((2, pix_max*4+1, pix_max*4 + 1), 
                                 dtype=np.float32)
-        self.pre_img[0, pix_max*2, pix_max*2] = self.front_size**2 * 6
-        self.pre_img[1, pix_max*2, pix_max*2] = self.back_size**2 * 6
+        for (i, size) in [(0, self.front_size), 
+                          (1, self.back_size)]:
 
-        # render each one
-        self.pre_img[0] = scipy.ndimage.filters.gaussian_filter(self.pre_img[0], 
-                                                       self.front_size)
-        self.pre_img[1] = scipy.ndimage.filters.gaussian_filter(self.pre_img[1], 
-                                                       self.back_size)
+            self.pre_img[i, pix_max*2, pix_max*2] = 1.0
+
+            # render each one
+            self.pre_img[i] = scipy.ndimage.filters.gaussian_filter(self.pre_img[i], size)
+            # normalize 
+            self.pre_img[i] = self.pre_img[i] / np.max(self.pre_img[i])
+
+            # extend top 
+            #self.pre_img[i][self.pre_img[i] > 0.5] = 1.0
+            
 
     def render_source(self, x, y, phi, theta):
         """

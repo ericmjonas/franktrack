@@ -12,22 +12,26 @@ import plotparticles
 import os
 import organizedata
 import videotools
+import measure
 
 from ruffus import * 
 import pf
 
+PIX_THRESHOLD = 200
+
 FL_DATA = "data/fl"
 def params():
     PARTICLEN = 1000
-    FRAMEN = 100
-    EPOCHS = ['bukowski_04.W1']
+    FRAMEN = 10000
+    EPOCHS = ['bukowski_04.W2']
     epoch = EPOCHS[0]
-    posnoise = 0.005
+    posnoise = 0.05
     velnoise = 0.05
             
     infile = [os.path.join(FL_DATA, epoch), 
               os.path.join(FL_DATA, epoch, 'config.pickle'), 
-              os.path.join(FL_DATA, epoch, 'frameagg.npz'), 
+              os.path.join(FL_DATA, epoch, 'region.pickle'), 
+              os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
               ]
 
     outfile = 'particles.%s.%f.%f.%d.%d.npz' % (epoch, posnoise, 
@@ -40,19 +44,23 @@ def params():
 
 @files(params)
 def pf_run((epoch_dir, epoch_config_filename, 
-            frame_agg_filename), outfile, epoch, posnoise, 
+            region_filename, led_params_filename), outfile, 
+           epoch, posnoise, 
            velnoise, PARTICLEN, 
            FRAMEN):
     np.random.seed(0)
     
-    cf = pickle.load(open(epoch_config_filename))
-    frameagg = np.load(frame_agg_filename)
+    cf = pickle.load(open(epoch_config_filename, 'r'))
+    region = pickle.load(open(region_filename, 'r'))
     
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
+    led_params = pickle.load(open(led_params_filename, 'r'))
+
+    eoparams = measure.led_params_to_EO(cf, led_params)
 
     eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
-    eo.set_params(10, 4, 2)
+    eo.set_params(*eoparams)
     
     le = likelihood.LikelihoodEvaluator(env, eo)
 
@@ -61,13 +69,20 @@ def pf_run((epoch_dir, epoch_config_filename,
                                    VELOCITY_NOISE_STD=velnoise)
     # load frames
     frames = organizedata.get_frames(epoch_dir, np.arange(FRAMEN))
-    frame_mean = frameagg['mean']
     for fi, f in enumerate(frames):
-        frames_normed = f.astype(float) - frame_mean
-        frames_trunc = np.maximum(frames_normed, 0)
-        assert np.min(frames_trunc) >= 0
-        assert np.max(frames_trunc) < 256
-        frames[fi] = frames_trunc
+        frames[fi][frames[fi] < PIX_THRESHOLD] = 0
+        pix_ul = env.gc.real_to_image(region['x_pos_min'], 
+                                   region['y_pos_min'])
+        frames[fi][:pix_ul[1], :] = 0
+        frames[fi][:, :pix_ul[0]] = 0
+
+        pix_lr = env.gc.real_to_image(region['x_pos_max'], 
+                                   region['y_pos_max'])
+        frames[fi][pix_lr[1]:, :] = 0
+        frames[fi][:, pix_lr[0]:] = 0
+
+        
+
     y = frames
     videotools.dump_grey_movie('test.avi', y)
 
@@ -88,8 +103,9 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     T_DELTA = 1/30.
     
     a = np.load(particles_file)
-    weights = a['weights']
-    particles = a['particles']
+    FRAMES = 2800
+    weights = a['weights'][:FRAMES]
+    particles = a['particles'][:FRAMES]
     N = len(particles)
 
     cf = pickle.load(open(epoch_config_filename))
@@ -121,7 +137,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         if v in ['x', 'y']:
             pylab.scatter(np.arange(N), truth[v][:N], 
                           linewidth=0, s=2)
-
+        pylab.grid(1)
         
     pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
     # now plot the # of particles consuming 95% of the prob mass
@@ -138,4 +154,4 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     pylab.savefig(plot_filename)
 
 
-pipeline_run([pf_run, pf_plot])
+pipeline_run([pf_run, pf_plot], multiprocess=6)
