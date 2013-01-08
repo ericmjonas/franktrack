@@ -30,6 +30,7 @@ def resample_multinomial(particles, weights):
 def normalize(x):
     return util.scores_to_prob(x)
 
+#@profile
 def particle_filter(y, model, N, PARTICLE_N = 100):
     #particles = np.zeros((N, PARTICLE_N))
     particles = []

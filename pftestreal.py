@@ -17,36 +17,35 @@ import measure
 from ruffus import * 
 import pf
 
-PIX_THRESHOLD = 200
-
 FL_DATA = "data/fl"
 def params():
-    PARTICLEN = 1000
+    PARTICLEN = 2000
     FRAMEN = 500
-    EPOCHS = ['bukowski_04.W2']
-    epoch = EPOCHS[0]
-    for posnoise in [0.001, 0.005, ]:
-        for velnoise in [0.001, 0.01]:
-            
-            infile = [os.path.join(FL_DATA, epoch), 
-                      os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                      os.path.join(FL_DATA, epoch, 'region.pickle'), 
-                      os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
-                      ]
+    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']
 
-            outfile = 'particles.%s.%f.%f.%d.%d.npz' % (epoch, posnoise, 
-                                                           velnoise, 
-                                                           PARTICLEN, FRAMEN)
+    for epoch in EPOCHS:
+        for posnoise in [0.01 ]:
+            for velnoise in [0.01]:
+                for pix_threshold in [200]:
 
+                    infile = [os.path.join(FL_DATA, epoch), 
+                              os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                              os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                              os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
+                              ]
 
-            yield (infile, outfile, epoch, posnoise, velnoise, PARTICLEN, FRAMEN)
+                    outfile = 'particles.%s.%f.%f.%d.%d.%d.npz' % (epoch, posnoise, 
+                                                                   velnoise, pix_threshold, 
+                                                                   PARTICLEN, FRAMEN)
+
+                    yield (infile, outfile, epoch, posnoise, velnoise, pix_threshold, PARTICLEN, FRAMEN)
            
 
 @files(params)
 def pf_run((epoch_dir, epoch_config_filename, 
             region_filename, led_params_filename), outfile, 
            epoch, posnoise, 
-           velnoise, PARTICLEN, 
+           velnoise, pix_threshold, PARTICLEN, 
            FRAMEN):
     np.random.seed(0)
     
@@ -64,13 +63,13 @@ def pf_run((epoch_dir, epoch_config_filename,
     
     le = likelihood.LikelihoodEvaluator(env, eo)
 
-    model_inst = model.LinearModel(env, le, 
+    model_inst = model.CustomModel(env, le, 
                                    POS_NOISE_STD=posnoise,
                                    VELOCITY_NOISE_STD=velnoise)
     # load frames
     frames = organizedata.get_frames(epoch_dir, np.arange(FRAMEN))
     for fi, f in enumerate(frames):
-        frames[fi][frames[fi] < PIX_THRESHOLD] = 0
+        frames[fi][frames[fi] < pix_threshold] = 0
         pix_ul = env.gc.real_to_image(region['x_pos_min'], 
                                    region['y_pos_min'])
         frames[fi][:pix_ul[1], :] = 0
@@ -94,7 +93,7 @@ def pf_run((epoch_dir, epoch_config_filename,
 def params_rendered():
     for p in params():
          yield ((p[0][0], p[0][1], p[1]), (p[1] + ".png", 
-                                           p[1] + ".xy.png", 
+                                           p[1] + ".xy.pdf", 
                                            p[1] + ".examples.png"))
 
 @follows(pf_run)
@@ -186,13 +185,15 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
         ax.scatter(np.arange(N), truth[v][:N], 
-                   linewidth=0, s=1, c='k')
+                   linewidth=0, s=2, c='k')
         for i in np.argwhere(np.isnan(truth[v][:N])):
-            ax.axvline(i, c='r', linewidth=0.1, alpha=0.4)
+            ax.axvline(i, c='r', linewidth=0.1, alpha=0.5)
 
         ax.grid(1)
         ax.set_xlim((0, N))
-        
+        ax.set_xlabel("time (frames)")
+        ax.set_ylabel("position (m)")
+    f2.suptitle(just_xy_filename)
     pylab.savefig(just_xy_filename, dpi=300)
                          
     # find the errors per point
@@ -219,7 +220,6 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         true_x = truth['x'][errs[plot_error_i]]
         true_y = truth['y'][errs[plot_error_i]]
         true_x_pix, true_y_pix = env.gc.real_to_image(true_x, true_y)
-        print true_x_pix, true_y_pix
 
         est_x  = vals_dict['x'][error_frame_i]
         est_y = vals_dict['y'][error_frame_i]
@@ -267,4 +267,109 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     pylab.savefig(examples_filename, dpi=300)
 
-pipeline_run([pf_run, pf_plot], multiprocess=6)
+def params_render_vid():
+    for p in params():
+         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".avi",))
+
+@follows(pf_run)
+@files(params_render_vid)
+def pf_render_vid((epoch_dir, epoch_config_filename, particles_file), 
+            (vid_filename,)):
+    
+    T_DELTA = 1/30.
+    
+    a = np.load(particles_file)
+    FRAMES = 100000000
+    weights = a['weights'][:FRAMES]
+    particles = a['particles'][:FRAMES]
+    N = len(particles)
+
+    led_params_filename = os.path.join(epoch_dir, "led.params.pickle")
+
+    cf = pickle.load(open(epoch_config_filename))
+    truth = np.load(os.path.join(epoch_dir, 'positions.npy'))
+    env = util.Environmentz(cf['field_dim_m'], 
+                            cf['frame_dim_pix'])
+    led_params = pickle.load(open(led_params_filename, 'r'))
+
+    eoparams = measure.led_params_to_EO(cf, led_params)
+
+    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
+    eo.set_params(*eoparams)
+
+    STATEVARS = ['x', 'y', 'xdot', 'ydot', 'phi', 'theta']
+    # convert types
+    vals = dict([(x, []) for x in STATEVARS])
+    for p in particles:
+        for v in STATEVARS:
+            vals[v].append([s[v] for s in p])
+    for v in STATEVARS:
+        vals[v] = np.array(vals[v])
+
+    vals_dict = {}
+
+    for vi, v in enumerate(STATEVARS):
+        v_bar = np.average(vals[v], axis=1, weights=weights)
+        vals_dict[v] = v_bar
+
+    frames = organizedata.get_frames(epoch_dir, 
+                                     np.arange(N))
+    truth, missing = measure.interpolate(truth)
+
+    WINDOW_PIX = 40
+    f = pylab.figure()
+    ax = pylab.subplot(1,1, 1)
+    for fi in range(N):
+        pylab.cla()
+        true_x = truth['x'][fi]
+        true_y = truth['y'][fi]
+        true_x_pix, true_y_pix = env.gc.real_to_image(true_x, true_y)
+
+        est_x  = vals_dict['x'][fi]
+        est_y = vals_dict['y'][fi]
+        est_phi = vals_dict['phi'][fi]
+        est_theta = vals_dict['theta'][fi]
+
+        est_x_pix, est_y_pix = env.gc.real_to_image(est_x, est_y)
+        
+
+            # now compute position of diodes
+        front_pos, back_pos = util.compute_pos(eo.length, est_x_pix, 
+                                               est_y_pix, 
+                                               est_phi, est_theta)
+
+        cir = pylab.Circle(front_pos, radius=eoparams[1],  
+                           ec='g', fill=False,
+                           linewidth=2)
+
+        ax.imshow(frames[fi], 
+                  interpolation='nearest', cmap=pylab.cm.gray)
+
+        ax.add_patch(cir)
+        cir = pylab.Circle(back_pos, radius=eoparams[2],  
+                           ec='r', fill=False, 
+                           linewidth=2)
+        ax.add_patch(cir)
+
+        # true
+        ax.axhline(true_y_pix, c='b')
+        ax.axvline(true_x_pix, c='b')
+        # extimated
+        ax.axhline(est_y_pix, c='y')
+        ax.axvline(est_x_pix, c='y')
+
+        # LED points in ground truth
+        for field_name, color in [('led_front', 'g'), ('led_back', 'r')]:
+            lpx, lpy = env.gc.real_to_image(*truth[field_name][fi])
+            ax.scatter([lpx], [lpy], c=color)
+
+
+        ax.set_xlim((true_x_pix - WINDOW_PIX, true_x_pix + WINDOW_PIX))
+        ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(fi)
+        f.savefig("%s.%08d.png" % (vid_filename, fi))
+    # pylab.savefig(examples_filename, dpi=300)
+
+pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=4)

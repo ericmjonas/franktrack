@@ -9,6 +9,7 @@ def norm_norm_peak(x_cur, sigma_d, sigma_e):
     """
     return x_cur / (1.0 + sigma_d**2/sigma_e**2)
 
+#@profile
 def rej_sample(x_cur, sigma_d, sigma_e):
     """
     returns sample from 
@@ -93,5 +94,5 @@ def sample():
     pylab.hist(x, normed=True, bins=50)
     pylab.savefig('drift.png', dpi=300)
         
-gen_plots()
+#gen_plots()
 #sample()
