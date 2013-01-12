@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import glob
+import subprocess
 
 class MPEGWrapper(object):
     """
@@ -77,3 +78,7 @@ def write_video(fname, array):
         bitmap = array2cv(array)
         
         cv.WriteFrame(vw, bitmap)
+
+def frames_to_mpng(frame_glob, outfile, fps=10):
+    cmd = "mencoder mf://%s -mf fps=%d:type=png -ovc copy -oac copy -o %s" % (frame_glob, fps, outfile)
+    subprocess.call(cmd, shell=True)

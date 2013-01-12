@@ -13,19 +13,20 @@ import os
 import organizedata
 import videotools
 import measure
+import video
 
 from ruffus import * 
 import pf
 
 FL_DATA = "data/fl"
 def params():
-    PARTICLEN = 2000
-    FRAMEN = 500
+    PARTICLEN = 1000
+    FRAMEN = 100
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']
 
     for epoch in EPOCHS:
         for posnoise in [0.01 ]:
-            for velnoise in [0.01]:
+            for velnoise in [0.1]:
                 for pix_threshold in [200]:
 
                     infile = [os.path.join(FL_DATA, epoch), 
@@ -121,6 +122,8 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
     eo.set_params(*eoparams)
+    truth_interp, missing = measure.interpolate(truth)
+
 
     STATEVARS = ['x', 'y', 'xdot', 'ydot', 'phi', 'theta']
     # convert types
@@ -152,6 +155,10 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         if v in ['x', 'y']:
             ax.scatter(np.arange(N), truth[v][:N], 
                           linewidth=0, s=1, c='k')
+        if v in ['xdot', 'ydot']:
+            truedelta = truth_interp[v[0]][1:(N+1)] - truth_interp[v[0]][:N]
+            ax.plot(np.arange(N), truedelta, 
+                          linewidth=1, c='k')
         ax.grid(1)
         ax.set_xlim((0, N))
 
@@ -319,6 +326,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     WINDOW_PIX = 40
     f = pylab.figure()
     ax = pylab.subplot(1,1, 1)
+    plot_temp_filenames = []
     for fi in range(N):
         pylab.cla()
         true_x = truth['x'][fi]
@@ -369,7 +377,13 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_title(fi)
-        f.savefig("%s.%08d.png" % (vid_filename, fi))
-    # pylab.savefig(examples_filename, dpi=300)
+        plot_filename = "%s.%08d.png" % (vid_filename, fi)
+        f.savefig(plot_filename)
+        plot_temp_filenames.append(plot_filename)
+
+    video.frames_to_mpng("%s.*.png" % vid_filename, vid_filename)
+    # delete extras
+    for f in plot_temp_filenames:
+        os.remove(f)
 
 pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=4)
