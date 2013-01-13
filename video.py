@@ -79,6 +79,6 @@ def write_video(fname, array):
         
         cv.WriteFrame(vw, bitmap)
 
-def frames_to_mpng(frame_glob, outfile, fps=10):
+def frames_to_mpng(frame_glob, outfile, fps=5):
     cmd = "mencoder mf://%s -mf fps=%d:type=png -ovc copy -oac copy -o %s" % (frame_glob, fps, outfile)
     subprocess.call(cmd, shell=True)

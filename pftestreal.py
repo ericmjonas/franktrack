@@ -18,34 +18,41 @@ import video
 from ruffus import * 
 import pf
 
+SIMILARITIES = [('dist2', 'dist', {'power' : 2}), 
+                ('dist4', 'dist', {'power' : 4})]
+
 FL_DATA = "data/fl"
 def params():
     PARTICLEN = 1000
-    FRAMEN = 100
+    FRAMEN = 500
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']
 
     for epoch in EPOCHS:
         for posnoise in [0.01 ]:
-            for velnoise in [0.1]:
+            for velnoise in [0.01]:
                 for pix_threshold in [200]:
+                    for sim_name, sim_type, sim_params in SIMILARITIES:
 
-                    infile = [os.path.join(FL_DATA, epoch), 
-                              os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                              os.path.join(FL_DATA, epoch, 'region.pickle'), 
-                              os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
-                              ]
+                        infile = [os.path.join(FL_DATA, epoch), 
+                                  os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                                  os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                                  os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
+                                  ]
 
-                    outfile = 'particles.%s.%f.%f.%d.%d.%d.npz' % (epoch, posnoise, 
-                                                                   velnoise, pix_threshold, 
-                                                                   PARTICLEN, FRAMEN)
+                        outfile = 'particles.%s.%s.%f.%f.%d.%d.%d.npz' % (epoch, sim_name, posnoise, 
+                                                                       velnoise, pix_threshold, 
+                                                                       PARTICLEN, FRAMEN)
 
-                    yield (infile, outfile, epoch, posnoise, velnoise, pix_threshold, PARTICLEN, FRAMEN)
+                        yield (infile, outfile, epoch, (sim_name, sim_type, sim_params), 
+                               posnoise, velnoise, pix_threshold, 
+                               PARTICLEN, FRAMEN)
            
 
 @files(params)
 def pf_run((epoch_dir, epoch_config_filename, 
             region_filename, led_params_filename), outfile, 
-           epoch, posnoise, 
+           epoch, (sim_name, sim_type, sim_params), 
+           posnoise, 
            velnoise, pix_threshold, PARTICLEN, 
            FRAMEN):
     np.random.seed(0)
@@ -62,7 +69,8 @@ def pf_run((epoch_dir, epoch_config_filename,
     eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
     eo.set_params(*eoparams)
     
-    le = likelihood.LikelihoodEvaluator(env, eo)
+    le = likelihood.LikelihoodEvaluator(env, eo, similarity=sim_type, 
+                                        sim_params = sim_params)
 
     model_inst = model.CustomModel(env, le, 
                                    POS_NOISE_STD=posnoise,
@@ -204,7 +212,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     pylab.savefig(just_xy_filename, dpi=300)
                          
     # find the errors per point
-
+    
     PLOT_ERRORS = 12
 
     errors = np.zeros(len(vals), dtype=np.float32)
@@ -323,12 +331,14 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                                      np.arange(N))
     truth, missing = measure.interpolate(truth)
 
-    WINDOW_PIX = 40
+    WINDOW_PIX = 60
     f = pylab.figure()
-    ax = pylab.subplot(1,1, 1)
+    ax_est = pylab.subplot(1,2, 1)
+    ax_particles = pylab.subplot(1, 2, 2)
     plot_temp_filenames = []
     for fi in range(N):
-        pylab.cla()
+        ax_est.clear()
+        ax_particles.clear()
         true_x = truth['x'][fi]
         true_y = truth['y'][fi]
         true_x_pix, true_y_pix = env.gc.real_to_image(true_x, true_y)
@@ -350,33 +360,56 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                            ec='g', fill=False,
                            linewidth=2)
 
-        ax.imshow(frames[fi], 
+        ax_est.imshow(frames[fi], 
                   interpolation='nearest', cmap=pylab.cm.gray)
+        ax_particles.imshow(frames[fi], 
+                            interpolation='nearest', cmap=pylab.cm.gray)
 
-        ax.add_patch(cir)
+        ax_est.add_patch(cir)
         cir = pylab.Circle(back_pos, radius=eoparams[2],  
                            ec='r', fill=False, 
                            linewidth=2)
-        ax.add_patch(cir)
+        ax_est.add_patch(cir)
 
         # true
-        ax.axhline(true_y_pix, c='b')
-        ax.axvline(true_x_pix, c='b')
+        ax_est.axhline(true_y_pix, c='b')
+        ax_est.axvline(true_x_pix, c='b')
         # extimated
-        ax.axhline(est_y_pix, c='y')
-        ax.axvline(est_x_pix, c='y')
+        ax_est.axhline(est_y_pix, c='y')
+        ax_est.axvline(est_x_pix, c='y')
 
         # LED points in ground truth
         for field_name, color in [('led_front', 'g'), ('led_back', 'r')]:
             lpx, lpy = env.gc.real_to_image(*truth[field_name][fi])
-            ax.scatter([lpx], [lpy], c=color)
+            ax_est.scatter([lpx], [lpy], c=color)
 
+        # now all particles
+        particle_pix_pts = np.zeros((len(particles[fi]), 2, 3), dtype=np.float)
+        for pi in range(len(particles[fi])):
+            
+            lpx, lpy = env.gc.real_to_image(particles[fi, pi]['x'], 
+                                            particles[fi, pi]['y'])
+            front_pos, back_pos = util.compute_pos(eo.length, lpx, lpy, 
+                                                   particles[fi, pi]['phi'], 
+                                                   particles[fi, pi]['theta'])
 
-        ax.set_xlim((true_x_pix - WINDOW_PIX, true_x_pix + WINDOW_PIX))
-        ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_title(fi)
+            particle_pix_pts[pi, 0] = front_pos
+            particle_pix_pts[pi, 1] = back_pos
+        ax_particles.scatter(particle_pix_pts[:, 0, 0], 
+                             particle_pix_pts[:, 0, 1], 
+                             linewidth=0, 
+                             alpha = 1.0, c='g', s=1)
+        ax_particles.scatter(particle_pix_pts[:, 1, 0], 
+                             particle_pix_pts[:, 1, 1], 
+                             linewidth=0, 
+                             alpha = 1.0, c='r', s=1)
+
+        for ax in [ax_est, ax_particles]:
+            ax.set_xlim((true_x_pix - WINDOW_PIX, true_x_pix + WINDOW_PIX))
+            ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title(fi)
         plot_filename = "%s.%08d.png" % (vid_filename, fi)
         f.savefig(plot_filename)
         plot_temp_filenames.append(plot_filename)

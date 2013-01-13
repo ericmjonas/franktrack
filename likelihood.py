@@ -139,11 +139,15 @@ class EvaluateObj(object):
 
 
 class LikelihoodEvaluator(object):
-    def __init__(self, env, evaluate_obj, similarity = 'absdif'):
+    def __init__(self, env, evaluate_obj, similarity = 'dist', 
+                 sim_params = None):
         self.env = env
         self.evaluate_obj = evaluate_obj
         self.similarity = similarity
-        
+        if sim_params == None:
+            self.sim_params = {'power' : 2}
+        else:
+            self.sim_params = sim_params
 
     def score_state(self, state, img):
         return self.score_state_full(state, img)
@@ -160,8 +164,12 @@ class LikelihoodEvaluator(object):
                                                        phi, theta)
         pi_pix = proposed_img*255
 
-        delta = (pi_pix - img.astype(np.float32))
-        s = - np.sum((delta)**2)
+        if self.similarity == "dist":
+            delta = (pi_pix - img.astype(np.float32))
+            s = - np.sum((delta)**self.sim_params['power'])
+        else:
+            raise NotImplemented()
+
         
         return s
 
