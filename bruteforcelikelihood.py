@@ -22,7 +22,7 @@ import measure
 from ruffus import * 
 import pf
 
-PIX_THRESHOLD = 200
+PIX_THRESHOLD = 10
 FL_DATA = "data/fl"
 
 #cloud.start_simulator()
@@ -30,7 +30,7 @@ FL_DATA = "data/fl"
 def params():
     EPOCHS = ['bukowski_04.W1']# , 'bukowski_04.W2', 
     #'bukowski_04.C', 'bukowski_04.linear']
-    FRAMES = np.arange(10)*100
+    FRAMES = np.arange(2)*100
     
     for epoch in EPOCHS:
         for frame in FRAMES:
@@ -144,6 +144,7 @@ def plot_likelihood((infile_pickle, infile_npz),
     scores = scores[:len(sv)]
 
     pylab.figure()
+    scores[np.isinf(scores)] = 0 
     pylab.hist(scores.flat, bins=255)
     pylab.savefig(outfile_hist, dpi=300)
 
@@ -441,7 +442,7 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
     eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
     eo.set_params(*EO_PARAMS)
     
-    le = likelihood.LikelihoodEvaluator(env, eo)
+    le = likelihood.LikelihoodEvaluator(env, eo, similarity='normcc')
 
     frames = organizedata.get_frames(dataset_dir, np.array([frame]))
     frame = frames[0]
