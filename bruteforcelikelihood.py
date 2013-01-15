@@ -442,7 +442,7 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
     eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
     eo.set_params(*EO_PARAMS)
     
-    le = likelihood.LikelihoodEvaluator(env, eo, similarity='normcc')
+    le = likelihood.LikelihoodEvaluator(env, eo)
 
     frames = organizedata.get_frames(dataset_dir, np.array([frame]))
     frame = frames[0]

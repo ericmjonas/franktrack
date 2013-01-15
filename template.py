@@ -4,6 +4,8 @@
 """
 
 import numpy as np
+import util2 as util
+import scipy.ndimage
 
 def overlap(W1, W2, s):
     """
@@ -41,7 +43,7 @@ def template_select(image, template, temp_x, temp_y):
 
     x1, x2 = overlap(IMG_C, T_C, temp_x)
     y1, y2 = overlap(IMG_R, T_R, temp_y)
-    print x1, x2, "y", y1, y2, IMG_R, T_R, temp_y
+
     # select the base image region
     img_region = image[y1:y2, x1:x2]
 
@@ -64,3 +66,55 @@ def template_select(image, template, temp_x, temp_y):
     
     return img_region, template_region
     
+class TemplateRenderGaussian(object):
+    """
+    Render target as two gaussian blobs. 
+    Center of returned image is diode center
+    There's actually no reason we can't just cache all of these
+    (360 * 180 == not very many)
+    """
+    def __init__(self):
+        pass
+
+    def set_params(self, length, front_size, back_size):
+        
+        self.length = length
+        self.front_size = front_size
+        self.back_size = back_size
+    
+    def render(self, phi, theta):
+        """
+        Returns a template where max intensity is 
+        1.0, min is 0.0, float32. The center of the 
+        returned image is the center of the diode array
+
+        """
+        
+        s = max(self.front_size, self.back_size)
+        template = np.zeros((2, self.length + 4*s, 
+                             self.length + 4*s))
+        D, W, H = template.shape
+        
+        front_pos, back_pos = util.compute_pos(self.length, 
+                                               W/2., H/2., phi, theta)
+        
+        def pos_to_int(p):
+            return np.rint(p).astype(int)
+
+        front_pos = pos_to_int(front_pos)
+        back_pos = pos_to_int(back_pos)
+
+        template[0, front_pos[1], front_pos[0]] = 1.0
+        template[1, back_pos[1], back_pos[0]] = 1.0
+
+        template[0] = scipy.ndimage.filters.gaussian_filter(template[0], 
+                                                            self.front_size)
+        template[0] = template[0] / np.max(template[0])
+        template[1] = scipy.ndimage.filters.gaussian_filter(template[1], 
+                                                            self.back_size)
+        template[1] = template[1] / np.max(template[1])
+        t = np.sum(template, axis=0)
+        t = t / np.max(t)
+        return t
+
+        
