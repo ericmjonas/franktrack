@@ -38,5 +38,29 @@ def template_select(image, template, temp_x, temp_y):
     
     # python's somewhat complex indexing rules, while normally our friend, 
     # make this more confusing 
-    
 
+    x1, x2 = overlap(IMG_C, T_C, temp_x)
+    y1, y2 = overlap(IMG_R, T_R, temp_y)
+    print x1, x2, "y", y1, y2, IMG_R, T_R, temp_y
+    # select the base image region
+    img_region = image[y1:y2, x1:x2]
+
+    if temp_x >= 0:
+        t_x1 = 0
+    else:
+        t_x1 = -temp_x
+
+    t_x2 = t_x1 + (x2-x1)
+
+    if temp_y >= 0:
+        t_y1 = 0
+    else:
+        t_y1 = -temp_y
+
+    t_y2 = t_y1 + (y2-y1)
+
+
+    template_region = template[t_y1:t_y2, t_x1:t_x2]
+    
+    return img_region, template_region
+    
