@@ -7,6 +7,7 @@ import scipy.ndimage
 # import cutil
 from matplotlib import pylab
 import util2 as util
+import template
 
 def pos_to_int(p):
     return np.rint(p).astype(int)
@@ -185,7 +186,7 @@ class LikelihoodEvaluator(object):
 
             s = np.sum((imgf - imgf_mean)*(pi_pix - pi_pix_mean))
             s = s / (np.sqrt(imgf_var * pi_pix_var))
-            s = s / (pi_pix.shape[0]*pi_pix.shape[1])
+            s = s / (len(proposed_img.flat))
             return s
 
         else:
@@ -194,35 +195,71 @@ class LikelihoodEvaluator(object):
         
         return s
 
+class LikelihoodEvaluator2(object):
+    def __init__(self, env, template_obj, similarity = 'dist', 
+                 sim_params = None):
+        self.env = env
+        self.template_obj = template_obj
+        self.similarity = similarity
+        if sim_params == None:
+            self.sim_params = {'power' : 2}
+        else:
+            self.sim_params = sim_params
 
-    # def score_state_subregion(self, state, img):
-    #     """
-    #     only score the most interesting area
-    #     """
-    #     x = state['x']
-    #     y = state['y']
+    def score_state(self, state, img):
+        return self.score_state_full(state, img)
 
+    def score_state_full(self, state, img):
+        assert len(img.shape)== 2
+        x = state['x']
+        y = state['y']
 
-    #     theta = state['theta']
-    #     phi = state['phi']
-    #     x_pix, y_pix = self.env.gc.real_to_image(x, y)
+        theta = state['theta']
+        phi = state['phi']
+        x_pix, y_pix = self.env.gc.real_to_image(x, y)
+        x_pix = int(x_pix)
+        y_pix = int(y_pix)
+        template_img = self.template_obj.render(phi, theta)
+        template_pix = template_img*255
+        img_region, template_region = template.template_select(img, template_pix, 
+                                                               x_pix - template_pix.shape[1]/2, 
+                                                               y_pix - template_pix.shape[0]/2)
+        print "real: (%f, %f)" % (x, y,), "pix: (%d, %d)" % ( x_pix, y_pix), img_region.shape        
+        if self.similarity == "dist":
+            MINSCORE = -1e80
+            if len(template_region.flat) == 0:
+                return MINSCORE
+            delta = (template_region - img_region.astype(np.float32))
+            s = - np.sum((delta)**self.sim_params['power']) 
+            s = s # / len(template_region.flat)
+        elif self.similarity == "normcc":
+            """
+            http://en.wikipedia.org/wiki/Cross-correlation#Normalized_cross-correlation
+            """
+            MINSCORE = 0
+            if len(template_region.flat) == 0:
+                return MINSCORE
+            template_mean = np.mean(template_region)
+            img_mean = np.mean(img_region)
+            print "template_mean", template_mean, "img_mean", img_mean
+            si = (template_region - template_mean)*(img_region - img_mean)
+            s = np.sum(si)
+            print "s=", s
+            template_std = np.std(template_region)
+            img_std = np.std(img_region)
+            if template_std <1e-7:
+                return MINSCORE
+            if img_std <1e-7:
+                return MINSCORE
 
-    #     proposed_img, rr = self.evaluate_obj.render_source(x_pix, y_pix,
-    #                                                        phi, theta)
-    #     rr_x = rr.get_x_bounded()
-    #     rr_y = rr.get_y_bounded()
-    #     proposed_img = proposed_img[rr_y[0]:rr_y[1], 
-    #                                 rr_x[0]:rr_x[1]]
-
-    #     pi_pix = proposed_img*255
-    #     img = img[rr_y[0]:rr_y[1], 
-    #               rr_x[0]:rr_x[1]]
-    #     if similarity == 'absdif':
-    #         delta = (pi_pix - img.astype(np.float32))
-    #         s = - np.sum(np.abs(delta))
-    #     else:
-    #         pass
-    #     return s
+            s = s / (template_std * img_std)
+            print "s=", s
+            s = s / len(template_region.flat)
+            print s
+            if not np.isfinite(s):
+                return MINSCORE
+        
+        return s
 
 class DiodeGeom(object):
     def __init__(self, length, front_radius, back_radius):

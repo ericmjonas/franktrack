@@ -1,6 +1,7 @@
 from nose.tools import * 
 import template
 import numpy as np
+from matplotlib import pylab
 
 def create_region(x, y):
     a = np.arange(x*y)
@@ -84,3 +85,19 @@ def test_template_select():
 
     ae(t1_a[0, 0], 5)
     ae(t1_a[2, 0], 11)
+
+
+    # crazy values
+    r1 = create_region(320, 240)
+    t1 = create_region(34, 34)
+    r1_a, t1_a = template.template_select(r1, t1, -17., -17.)
+
+def test_template_render():
+
+    tr = template.TemplateRenderGaussian()
+    tr.set_params(14, 5, 3)
+
+    i1 = tr.render(np.pi/2, np.pi/2)
+    pylab.imshow(i1, interpolation='nearest', origin='lower', 
+                 vmin=0, vmax=1.0, cmap=pylab.cm.gray)
+    #pylab.show()

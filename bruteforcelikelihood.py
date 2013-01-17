@@ -18,19 +18,21 @@ import organizedata
 import videotools
 import glob
 import measure
+import template
+
 
 from ruffus import * 
 import pf
 
-PIX_THRESHOLD = 10
+PIX_THRESHOLD = 200
 FL_DATA = "data/fl"
 
-#cloud.start_simulator()
+cloud.start_simulator()
 
 def params():
     EPOCHS = ['bukowski_04.W1']# , 'bukowski_04.W2', 
     #'bukowski_04.C', 'bukowski_04.linear']
-    FRAMES = np.arange(2)*100
+    FRAMES = np.arange(1)*100
     
     for epoch in EPOCHS:
         for frame in FRAMES:
@@ -76,13 +78,13 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
 
     EO = measure.led_params_to_EO(cf, led_params)
 
-    x_range = np.linspace(0, cf['field_dim_m'][1], 150)
-    y_range = np.linspace(0, cf['field_dim_m'][0], 150)
+    x_range = np.linspace(0, cf['field_dim_m'][1], 100)
+    y_range = np.linspace(0, cf['field_dim_m'][0], 100)
     phi_range = np.linspace(0, 2*np.pi, 20)
-    degrees_from_vertical = 30
+    degrees_from_vertical = 15
     radian_range = degrees_from_vertical/180. * np.pi
     theta_range = np.linspace(np.pi/2.-radian_range, 
-                              np.pi/2. + radian_range, 6)
+                              np.pi/2. + radian_range, 4)
 
     sv = create_state_vect(y_range, x_range, phi_range, theta_range)
 
@@ -102,6 +104,11 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
                      [phi_range]*CN, [theta_range]*CN, 
                      args, [frame]*CN,  [EO]*CN, 
                      _type='f2', _vol="my-vol", _env="base/precise")
+    # jids = map(picloud_score_frame, [dataset_name]*CN,
+    #                  [x_range]*CN, [y_range]*CN, 
+    #                  [phi_range]*CN, [theta_range]*CN, 
+    #                  args, [frame]*CN,  [EO]*CN)
+
 
     np.savez_compressed(outfile_npz, 
                         x_range = x_range, y_range=y_range, 
@@ -120,6 +127,7 @@ def score_frame_wait((infile_wait, infile_npz), (outfile_pickle, outfile_npz)):
     jids = p['jids']
 
     results = cloud.result(jids)
+    #results = [x for x in jids] 
     scores = np.concatenate(results)
     np.savez_compressed(outfile_npz, scores=scores, **dnpz)
     pickle.dump(p, open(outfile_pickle, 'w'))
@@ -144,9 +152,11 @@ def plot_likelihood((infile_pickle, infile_npz),
     scores = scores[:len(sv)]
 
     pylab.figure()
-    scores[np.isinf(scores)] = 0 
-    pylab.hist(scores.flat, bins=255)
+    scores_flat = np.array(scores.flat)
+    pylab.hist(scores_flat[np.isfinite(scores_flat)], bins=255)
     pylab.savefig(outfile_hist, dpi=300)
+
+    scores[np.isinf(scores)] = -1e20
 
     TOP_R, TOP_C = 3, 4
     TOP_N = TOP_R * TOP_C
@@ -208,13 +218,13 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
                                        'config.pickle')))
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
-    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
+    tp = template.TemplateRenderGaussian()
     led_params = pickle.load(open(os.path.join(data_p['dataset_dir'], 
                                                "led.params.pickle")))
 
     EO_PARAMS = measure.led_params_to_EO(cf, led_params)
 
-    eo.set_params(*EO_PARAMS)
+    tp.set_params(*EO_PARAMS)
 
     img = frames[0]
     img_thold = img.copy()
@@ -243,13 +253,12 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
             # render the fake image
             ax_generated = pylab.subplot2grid((TOP_R*2, TOP_C*2), 
                                       (row*2+1, col*2 + 1))
-            rendered_img = eo.render_source(x_pix, y_pix, 
-                                            phi, theta)
+            rendered_img = tp.render(phi, theta)
             ax_generated.imshow(rendered_img*255, interpolation='nearest', 
                                 cmap=pylab.cm.gray, 
                                 vmin = 0, vmax=255)
             # now compute position of diodes
-            front_pos, back_pos = util.compute_pos(eo.length, x_pix, y_pix, 
+            front_pos, back_pos = util.compute_pos(tp.length, x_pix, y_pix, 
                                                    phi, theta)
 
             cir = pylab.Circle(front_pos, radius=EO_PARAMS[1],  ec='g', fill=False,
@@ -259,7 +268,7 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
                                linewidth=2)
             ax.add_patch(cir)
             ax.set_title("%2.2f, %2.2f, %1.1f, %1.1f, %4.2f" % (x, y, phi, theta, score), size="xx-small")
-            for a in [ax, ax_thold, ax_generated]:
+            for a in [ax, ax_thold]:
                 a.set_xticks([])
                 a.set_yticks([])
                 a.set_xlim(x_pix - X_MARGIN, x_pix+X_MARGIN)
@@ -268,136 +277,6 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
     f.savefig(zoom_outfile, dpi=300)
 
 
-# @files(frame_params)
-# def examine_frame((epoch_dir, epoch_config_filename, epoch_region_filename,
-#             frame_hist_filename), outfile, epoch, frame):
-#     np.random.seed(0)
-    
-#     cf = pickle.load(open(epoch_config_filename))
-#     framehist = np.load(frame_hist_filename)
-#     region = pickle.load(open(epoch_region_filename))
-
-#     frames = organizedata.get_frames(epoch_dir, np.array([frame]))
-#     frame = frames[0]
-#     frame_hist = framehist['hist']
-#     frame_mean = np.mean(frame_hist, axis=2)
-
-#     env = util.Environmentz(cf['field_dim_m'], 
-#                             cf['frame_dim_pix'])
-    
-#     region_lower_corner = env.gc.real_to_image(region['x_pos_min'], 
-#                                              region['yXb_pos_min'])
-#     region_upper_corner = env.gc.real_to_image(region['x_pos_max'], 
-#                                              region['y_pos_max'])
-
-#     maxpoint = np.argmax(frame)
-#     max_y, max_x = np.unravel_index(maxpoint, frame.shape)
-
-#     pylab.figure()
-#     pylab.subplot(3, 2, 1)
-#     pylab.imshow(frame, interpolation='nearest')
-#     pylab.axhline(max_y, c='r', alpha=0.3)
-#     pylab.axvline(max_x, c='g', alpha=0.3)
-
-#     pylab.subplot(3, 2, 3)
-#     pylab.plot(frame[max_y, :], 'r')
-#     pylab.plot(frame[:, max_x], 'g')
-
-#     # attempt to select all pix that are outside their std dev
-#     pylab.subplot(3, 2, 5)
-#     pylab.imshow(frame, interpolation='nearest', cmap=pylab.cm.gray)
-    
-#     pylab.gca().add_patch(pylab.Rectangle(region_lower_corner,
-#                               region_upper_corner[0] - region_lower_corner[0], 
-#                               region_upper_corner[1] - region_lower_corner[1], fill=False, linewidth=2, edgecolor='r'))
-#     for thold_i, thold in enumerate([250, 255]):
-#         #outlier_mask = frame > (frame_mean + 2*frame_std)
-#         high_mask = frame >= thold
-
-#         tgt_mask = high_mask # np.logical_and(high_mask, outlier_mask)
-#         frame2 = frame.copy()
-
-#         S = 6
-#         a = scipy.ndimage.binary_dilation(tgt_mask, 
-#                                           structure=np.ones((S, S)))
-#         frame2[np.logical_not(a)] = 0
-
-#         pylab.subplot(3, 2, 2*thold_i + 2)
-#         pylab.imshow(frame2, interpolation='nearest', cmap=pylab.cm.gray)
-
-#     # # now look at entropy of spots
-#     # ent = np.zeros((frame_hist.shape[0], frame_hist.shape[1]))
-#     # for r in range(frame_hist.shape[0]):
-#     #     for c in range(frame_hist.shape[1]):
-#     #         v = frame_hist[r, c]
-#     #         not_zeros = v > 0
-#     #         p = v / np.sum(v)
-            
-#     #         ent[r, c] = -np.sum(p[not_zeros] * np.log2(p[not_zeros]))
-#     # pylab.subplot(3, 2, 6)
-#     # pylab.imshow(ent)
-#     pylab.savefig(outfile, dpi=400)
-
-# Def params_rendered():
-#     for p in params():
-#          yield ((p[0][0], p[0][1], p[1]), p[1] + ".pdf")
-
-# @follows(pf_run)
-# @files(params_rendered)
-# def pf_plot((epoch_dir, epoch_config_filename, particles_file), 
-#             plot_filename):
-    
-#     T_DELTA = 1/30.
-    
-#     a = np.load(particles_file)
-#     weights = a['weights']
-#     particles = a['particles']
-#     N = len(particles)
-
-#     cf = pickle.load(open(epoch_config_filename))
-#     truth = np.load(os.path.join(epoch_dir, 'positions.npy'))
-    
-#     STATEVARS = ['x', 'y', 'xdot', 'ydot', 'phi', 'theta']
-#     # convert types
-#     vals = dict([(x, []) for x in STATEVARS])
-#     for p in particles:
-#         for v in STATEVARS:
-#             vals[v].append([s[v] for s in p])
-#     for v in STATEVARS:
-#         vals[v] = np.array(vals[v])
-
-#     pylab.figure()
-#     for vi, v in enumerate(STATEVARS):
-#         v_bar = np.average(vals[v], axis=1, weights=weights)
-#         x = np.arange(0, len(v_bar))
-#         cred = np.zeros((len(x), 2), dtype=np.float)
-#         for ci, (p, w) in enumerate(zip(vals[v], weights)):
-#             cred[ci] = util.credible_interval(p, w)
-
-#         pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
-
-#         pylab.plot(x, v_bar, color='b')
-#         pylab.fill_between(x, cred[:, 0],
-#                            cred[:, 1], facecolor='b', 
-#                            alpha=0.4)
-#         if v in ['x', 'y']:
-#             pylab.scatter(np.arange(N), truth[v][:N], 
-#                           linewidth=0, s=2)
-
-        
-#     pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
-#     # now plot the # of particles consuming 95% of the prob mass
-#     real_particle_num = []
-#     for w in weights:
-#         w = w / np.sum(w) # make sure they're normalized
-#         w = np.sort(w)[::-1] # sort, reverse order
-#         wcs = np.cumsum(w)
-#         wcsi = np.searchsorted(wcs, 0.95)
-#         real_particle_num.append(wcsi)
-
-#     pylab.plot(real_particle_num)
-
-#     pylab.savefig(plot_filename)
 
 def create_state_vect(y_range, x_range, phi_range, theta_range):
     N = len(y_range) * len(x_range) * len(phi_range) * len(theta_range)
@@ -439,10 +318,11 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
 
-    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
-    eo.set_params(*EO_PARAMS)
+    tp = template.TemplateRenderGaussian()
+
+    tp.set_params(*EO_PARAMS)
     
-    le = likelihood.LikelihoodEvaluator(env, eo)
+    le = likelihood.LikelihoodEvaluator2(env, tp, similarity='normcc')
 
     frames = organizedata.get_frames(dataset_dir, np.array([frame]))
     frame = frames[0]
@@ -458,8 +338,8 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
         y = state_i['y']
         if region['x_pos_min'] <= x <= region['x_pos_max'] and \
                 region['y_pos_min'] <= y <= region['y_pos_max']:
-        
-            score = le.score_state(state_i, frames)
+            print 'Scoring, bitch'
+            score = le.score_state(state_i, frame)
             scores[i] = score
         else:
             scores[i] = -1e100
@@ -467,4 +347,4 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
 
 if __name__ == "__main__":
     pipeline_run([score_frame_wait, plot_likelihood, 
-                  plot_likelihood_zoom], multiprocess=4)
+                  plot_likelihood_zoom])

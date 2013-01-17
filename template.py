@@ -14,8 +14,8 @@ def overlap(W1, W2, s):
     
     """
     # this is so gross but is a good first start
-    x = np.arange(W1)
-    y = np.arange(W2) + s
+    x = np.arange(int(W1))
+    y = np.arange(int(W2)) + int(s)
     z = np.intersect1d(x, y)
     if len(z) == 0:
         return (0, 0)
@@ -37,7 +37,7 @@ def template_select(image, template, temp_x, temp_y):
     """
     IMG_R, IMG_C = image.shape[0], image.shape[1]
     T_R, T_C = template.shape[0], template.shape[1]
-    
+    print "ts:", image.shape, template.shape, temp_x, temp_y
     # python's somewhat complex indexing rules, while normally our friend, 
     # make this more confusing 
 
