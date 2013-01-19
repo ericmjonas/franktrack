@@ -110,9 +110,11 @@ class TemplateRenderGaussian(object):
         template[0] = scipy.ndimage.filters.gaussian_filter(template[0], 
                                                             self.front_size)
         template[0] = template[0] / np.max(template[0])
+        template[0][template[0]<0.7] = 0.0
         template[1] = scipy.ndimage.filters.gaussian_filter(template[1], 
                                                             self.back_size)
         template[1] = template[1] / np.max(template[1])
+        template[1][template[1]<0.7] = 0.0
         t = np.sum(template, axis=0)
         t = t / np.max(t)
         return t
