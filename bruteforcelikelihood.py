@@ -27,47 +27,40 @@ import pf
 PIX_THRESHOLD = 200
 FL_DATA = "data/fl"
 
+X_GRID_NUM = 150
+Y_GRID_NUM = 150
+PHI_GRID_NUM = 32
+THETA_GRID_NUM =  6
+
+USE_CLOUD = True
 #cloud.start_simulator()
 
+LIKELIHOOD_SETTING = [{'similarity' : 'dist'}, 
+                      {'similarity' : 'normcc'}]
+
 def params():
-    EPOCHS = ['bukowski_04.W1']# , 'bukowski_04.W2', 
+    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']# , 'bukowski_04.W2', 
     #'bukowski_04.C', 'bukowski_04.linear']
     FRAMES = np.arange(10)*100
     
     for epoch in EPOCHS:
         for frame in FRAMES:
-            infiles = [os.path.join(FL_DATA, epoch), 
-                      os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                      os.path.join(FL_DATA, epoch, 'framehist.npz'), 
-                      ]
-            basename = '%s.likelihoodscores.%05d' % (epoch, frame)
-            outfiles = [basename + ".wait.pickle", 
-                        basename + ".wait.npz"]
-            
-            yield (infiles, outfiles, epoch, frame)
+            for likelihood_i in range(len(LIKELIHOOD_SETTING)):
+                infiles = [os.path.join(FL_DATA, epoch), 
+                          os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                          os.path.join(FL_DATA, epoch, 'framehist.npz'), 
+                          ]
+                basename = '%s.likelihoodscores.%02d.%05d' % (epoch, likelihood_i, frame)
+                outfiles = [basename + ".wait.pickle", 
+                            basename + ".wait.npz"]
+
+                yield (infiles, outfiles, epoch, frame, likelihood_i)
            
-# def frame_params():
-#     EPOCHS = [os.path.split(f)[1] for f in glob.glob(FL_DATA + "/*")]
-#     FRAMES = np.arange(10)*50
-    
-#     for epoch in EPOCHS:
-#         for frame_pos in FRAMES:
-#             for f in range(3):
-#                 frame = frame_pos + f
-#                 infile = [os.path.join(FL_DATA, epoch), 
-#                           os.path.join(FL_DATA, epoch, 'config.pickle'), 
-#                           os.path.join(FL_DATA, epoch, 'region.pickle'), 
-#                           os.path.join(FL_DATA, epoch, 'framehist.npz'), 
-#                           ]
-
-#                 outfile = '%s.likelihoodscores.%05d.pdf' % (epoch, frame)
-
-#                 yield (infile, outfile, epoch, frame)
 
 @files(params)
 def score_frame_queue((dataset_dir, dataset_config_filename, 
             frame_hist_filename), (outfile_wait, 
-                                   outfile_npz), dataset_name, frame):
+                                   outfile_npz), dataset_name, frame, likelihood_i):
 
     np.random.seed(0)
     
@@ -78,18 +71,18 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
 
     EO = measure.led_params_to_EO(cf, led_params)
 
-    x_range = np.linspace(0, cf['field_dim_m'][1], 200)
-    y_range = np.linspace(0, cf['field_dim_m'][0], 200)
-    phi_range = np.linspace(0, 2*np.pi, 20)
-    degrees_from_vertical = 15
+    x_range = np.linspace(0, cf['field_dim_m'][1], X_GRID_NUM)
+    y_range = np.linspace(0, cf['field_dim_m'][0], Y_GRID_NUM)
+    phi_range = np.linspace(0, 2*np.pi, PHI_GRID_NUM)
+    degrees_from_vertical = 30
     radian_range = degrees_from_vertical/180. * np.pi
     theta_range = np.linspace(np.pi/2.-radian_range, 
-                              np.pi/2. + radian_range, 4)
+                              np.pi/2. + radian_range, THETA_GRID_NUM)
 
     sv = create_state_vect(y_range, x_range, phi_range, theta_range)
 
     # now the input args
-    chunk_size = 40000
+    chunk_size = 80000
     chunks = int(np.ceil(len(sv) / float(chunk_size)))
 
     args = []
@@ -98,17 +91,19 @@ def score_frame_queue((dataset_dir, dataset_config_filename,
 
     CN = chunks
     results = []
-    print "MAPPING TO THE CLOUD" 
-    jids = cloud.map(picloud_score_frame, [dataset_name]*CN,
-                     [x_range]*CN, [y_range]*CN, 
-                     [phi_range]*CN, [theta_range]*CN, 
-                     args, [frame]*CN,  [EO]*CN, 
-                     _type='f2', _vol="my-vol", _env="base/precise")
-    # jids = map(picloud_score_frame, [dataset_name]*CN,
-    #                  [x_range]*CN, [y_range]*CN, 
-    #                  [phi_range]*CN, [theta_range]*CN, 
-    #                  args, [frame]*CN,  [EO]*CN)
-
+    if USE_CLOUD: 
+        print "MAPPING TO THE CLOUD" 
+        jids = cloud.map(picloud_score_frame, [dataset_name]*CN,
+                         [x_range]*CN, [y_range]*CN, 
+                         [phi_range]*CN, [theta_range]*CN, 
+                         args, [frame]*CN,  [EO]*CN, [likelihood_i]*CN,
+                         _type='f2', _vol="my-vol", _env="base/precise")
+    else:
+        jids = map(picloud_score_frame, [dataset_name]*CN,
+                   [x_range]*CN, [y_range]*CN, 
+                   [phi_range]*CN, [theta_range]*CN, 
+                   args, [frame]*CN,  [EO]*CN, [likelihood_i]*CN)
+        
 
     np.savez_compressed(outfile_npz, 
                         x_range = x_range, y_range=y_range, 
@@ -126,17 +121,13 @@ def score_frame_wait((infile_wait, infile_npz), (outfile_pickle, outfile_npz)):
     
     jids = p['jids']
 
-    results = cloud.result(jids)
-    #results = [x for x in jids] 
+    if USE_CLOUD:
+        results = cloud.result(jids)
+    else:
+        results = [x for x in jids] 
     scores = np.concatenate(results)
     np.savez_compressed(outfile_npz, scores=scores, **dnpz)
     pickle.dump(p, open(outfile_pickle, 'w'))
-    # save the results
-    
-#     data = np.load(infile)
-#     scores = data['scores']
-#     phi_range = data['phi_range']
-#     x = int(np.ceil(np.sqrt(len(phi_range))))
 
 
 @transform(score_frame_wait, suffix(".pickle"), [".png", ".hist.png"])
@@ -218,7 +209,7 @@ def plot_likelihood_zoom((infile_pickle, infile_npz),
                                        'config.pickle')))
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
-    tp = template.TemplateRenderGaussian()
+    tp = template.TemplateRenderCircleBorder()
     led_params = pickle.load(open(os.path.join(data_p['dataset_dir'], 
                                                "led.params.pickle")))
 
@@ -296,7 +287,7 @@ def create_state_vect(y_range, x_range, phi_range, theta_range):
     return state
 
 def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
-                        state_idx, frame, EO_PARAMS):
+                        state_idx, frame, EO_PARAMS, likelihood_i):
     """
     pi-cloud runner, every instance builds up full state, but
     we only evaluate the states in [state_idx_to_eval[0], state_idx_to_eval[1])
@@ -318,11 +309,12 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
     env = util.Environmentz(cf['field_dim_m'], 
                             cf['frame_dim_pix'])
 
-    tp = template.TemplateRenderGaussian()
+    tp = template.TemplateRenderCircleBorder()
     
     tp.set_params(*EO_PARAMS)
+    ls = LIKELIHOOD_SETTING[likelihood_i]
     
-    le = likelihood.LikelihoodEvaluator2(env, tp, similarity='normcc')
+    le = likelihood.LikelihoodEvaluator2(env, tp, similarity=ls['similarity'])
 
     frames = organizedata.get_frames(dataset_dir, np.array([frame]))
     frame = frames[0]
@@ -338,7 +330,6 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
         y = state_i['y']
         if region['x_pos_min'] <= x <= region['x_pos_max'] and \
                 region['y_pos_min'] <= y <= region['y_pos_max']:
-            print 'Scoring, bitch'
             score = le.score_state(state_i, frame)
             scores[i] = score
         else:
@@ -347,4 +338,4 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
 
 if __name__ == "__main__":
     pipeline_run([score_frame_wait, plot_likelihood, 
-                  plot_likelihood_zoom])
+                  plot_likelihood_zoom], multiprocess=6)

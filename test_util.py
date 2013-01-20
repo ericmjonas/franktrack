@@ -2,6 +2,7 @@ import numpy as np
 from numpy.testing import * 
 from nose.tools import *
 import util2 as util
+import time
 
 def test_geom_converter():
     gc = util.GeomConverter((320, 240), 
@@ -76,3 +77,33 @@ def test_extract_region():
                 s = util.extract_region_safe(x, r, c, p, 17)
                 newx[r, c] = s[p, p]
         assert_array_equal(newx, x)
+
+
+def test_render_hat():
+    N = 100
+    H = 48
+    W = 64
+    x = 30
+    y = 20
+    size = 3.0
+    BORDER = 0.2
+    slows = []
+    t1 = time.time()
+    for i in range(N):
+        img = util.render_hat_ma(H, W, x, y, size, BORDER)
+        slows.append(img)
+    t2 = time.time()
+    print "slows took", (t2-t1)/N*1e6, "us per render"
+
+    fasts = []
+    t1 = time.time()
+    for i in range(N):
+        img = util.render_hat_ma_fast(H, W, x, y, size, BORDER)
+        fasts.append(img)
+    t2 = time.time()
+    print "fasts took", (t2-t1)/N*1e6, "us per render"
+
+    for s, f in zip(slows, fasts):
+        assert_allclose(s, f)
+
+        

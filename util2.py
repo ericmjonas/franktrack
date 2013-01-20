@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats
 import os
+import numpy.ma as ma
 
 """
 UNITS: 
@@ -199,4 +200,30 @@ def extract_region_safe(a, r, c, n, defaultval = 0):
 
     return region
 
-    
+def render_hat_ma(H, W, x, y, size, BORDER):
+    tm = np.ma.zeros((H, W), dtype=np.float32)
+    for r in range(H):
+        for c in range(W):
+            d = np.sqrt((r-x)**2 + (c-y)**2)
+            if d < size:
+                tm[r, c] = 1.0
+            elif d >= size and d < (size*(1.0+BORDER)):
+                tm[r, c] = 0.0
+            else:
+                tm[r, c] = ma.masked
+    return tm
+
+def render_hat_ma_fast(H, W, x, y, size, BORDER):
+    tm = np.ma.zeros((H, W), dtype=np.float32)
+    a = np.mgrid[0:H, 0:W]
+    a[0] = a[0] - x
+    a[1] = a[1] - y
+
+    a=a**2
+    a = np.sum(a, axis=0)
+    a = np.sqrt(a)
+    tm[a < size] = 1.0
+    tm[(a >= size) * (a < (size*(1.0+BORDER)))] = 0.0
+    tm[a >= (size*(1.0+BORDER))] = ma.masked
+
+    return tm

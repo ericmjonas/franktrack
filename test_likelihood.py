@@ -63,8 +63,8 @@ def test_interval():
 
 def test_likelihood_evaluator2():
     
-    tr = template.TemplateRenderGaussian()
-    tr.set_params(14, 5, 3)
+    tr = template.TemplateRenderCircleBorder()
+    tr.set_params(14, 6, 4)
 
     t1 = tr.render(0, np.pi/2)
     img = np.zeros((240, 320), dtype=np.uint8)
@@ -80,8 +80,8 @@ def test_likelihood_evaluator2():
 
     state = np.zeros(1, dtype=util.DTYPE_STATE)
 
-    xvals = np.linspace(0, 2., 100)
-    yvals = np.linspace(0, 1.5, 100)
+    xvals = np.linspace(0, 2., 200)
+    yvals = np.linspace(0, 1.5, 200)
     res = np.zeros((len(yvals), len(xvals)), dtype=np.float32)
     for yi, y in enumerate(yvals):
         for xi, x in enumerate(xvals):

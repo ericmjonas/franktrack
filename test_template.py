@@ -95,9 +95,17 @@ def test_template_select():
 def test_template_render():
 
     tr = template.TemplateRenderGaussian()
-    tr.set_params(14, 5, 3)
+    tr.set_params(14, 7, 4)
 
     i1 = tr.render(np.pi/2, np.pi/2)
-    pylab.imshow(i1, interpolation='nearest', origin='lower', 
-                 vmin=0, vmax=1.0, cmap=pylab.cm.gray)
-    #pylab.show()
+    print type(i1), i1.shape
+    
+    pylab.subplot(1, 2, 1)
+    pylab.imshow(i1, interpolation='nearest')
+
+    pylab.colorbar()
+
+    pylab.subplot(1, 2, 2)
+    pylab.imshow(i1.mask.astype(float), interpolation='nearest')
+    pylab.colorbar()
+    pylab.show()

@@ -224,27 +224,25 @@ class LikelihoodEvaluator2(object):
         img_region, template_region = template.template_select(img, template_pix, 
                                                                x_pix - template_pix.shape[1]/2, 
                                                                y_pix - template_pix.shape[0]/2)
-        print "real: (%f, %f)" % (x, y,), "pix: (%d, %d)" % ( x_pix, y_pix), img_region.shape        
+        tr_size = template_region.count()
         if self.similarity == "dist":
             MINSCORE = -1e80
-            if len(template_region.flat) == 0:
+            if tr_size == 0:
                 return MINSCORE
             delta = (template_region - img_region.astype(np.float32))
             s = - np.sum((delta)**self.sim_params['power']) 
-            s = s # / len(template_region.flat)
+            s = s / tr_size
         elif self.similarity == "normcc":
             """
             http://en.wikipedia.org/wiki/Cross-correlation#Normalized_cross-correlation
             """
             MINSCORE = 0
-            if len(template_region.flat) == 0:
+            if tr_size == 0:
                 return MINSCORE
             template_mean = np.mean(template_region)
             img_mean = np.mean(img_region)
-            print "template_mean", template_mean, "img_mean", img_mean
             si = (template_region - template_mean)*(img_region - img_mean)
             s = np.sum(si)
-            print "s=", s
             template_std = np.std(template_region)
             img_std = np.std(img_region)
             if template_std <1e-7:
@@ -253,9 +251,8 @@ class LikelihoodEvaluator2(object):
                 return MINSCORE
 
             s = s / (template_std * img_std)
-            print "s=", s
-            s = s / len(template_region.flat)
-            print s
+            s = s / tr_size
+
             if not np.isfinite(s):
                 return MINSCORE
         
