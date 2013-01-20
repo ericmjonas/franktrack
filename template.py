@@ -103,21 +103,24 @@ class TemplateRenderGaussian(object):
 
         front_pos = pos_to_int(front_pos)
         back_pos = pos_to_int(back_pos)
-
+            
         template[0, front_pos[1], front_pos[0]] = 1.0
         template[1, back_pos[1], back_pos[0]] = 1.0
 
         template[0] = scipy.ndimage.filters.gaussian_filter(template[0], 
                                                             self.front_size)
         template[0] = template[0] / np.max(template[0])
-        template[0][template[0]<0.7] = 0.0
+        template[0][template[0]<0.2] = 0.0
+
+
         template[1] = scipy.ndimage.filters.gaussian_filter(template[1], 
                                                             self.back_size)
         template[1] = template[1] / np.max(template[1])
-        template[1][template[1]<0.7] = 0.0
+        template[1][template[1]<0.2] = 0.0
+
         t = np.sum(template, axis=0)
         t = t / np.max(t)
-        tm = np.ma.masked_less(t, -1.0)
+        tm = np.ma.masked_less(t, 0.0001)
         return tm
 
         
@@ -155,7 +158,7 @@ class TemplateRenderCircleBorder(object):
 
         front_pos = pos_to_int(front_pos)
         back_pos = pos_to_int(back_pos)
-        BORDER = 0.3
+        BORDER = 0.4
         for i, size, pos in [(0, self.front_size, front_pos), 
                              (1, self.back_size, back_pos)]:
             template[i] = util.render_hat_ma_fast(H, W, pos[1], pos[0], 

@@ -214,8 +214,12 @@ class CustomModel(object):
         """
         s = np.zeros(N, dtype=DTYPE_LATENT_STATE)
 
-        s['x'] = np.random.rand(N) * self.env.room_dim[1]*0.99
-        s['y'] = np.random.rand(N) * self.env.room_dim[0]*0.99
+        room_border = 0.1
+        y_dim, x_dim = self.env.room_dim
+
+        
+        s['x'] = np.random.rand(N) * x_dim*(1-2*room_border) + x_dim*room_border
+        s['y'] = np.random.rand(N) * y_dim*(1-2*room_border) + y_dim*room_border
         s['xdot'] = np.random.normal(0, 0.01, N)
         s['ydot'] = np.random.normal(0, 0.01, N)
         s['phi'] = np.random.rand(N) * np.pi*2

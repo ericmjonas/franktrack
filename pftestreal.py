@@ -1,10 +1,10 @@
 import numpy as np
 import scipy.stats
 import cPickle as pickle
-from matplotlib import pyplot
 import likelihood
 import util2 as util
 import model
+import template
 import time
 from matplotlib import pylab
 import cloud
@@ -22,9 +22,12 @@ SIMILARITIES = [('dist2', 'dist', {'power' : 2}),
                 ('dist4', 'dist', {'power' : 4})]
 
 FL_DATA = "data/fl"
+
+TemplateObj = template.TemplateRenderCircleBorder
+
 def params():
     PARTICLEN = 1000
-    FRAMEN = 500
+    FRAMEN = 100
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']
 
     for epoch in EPOCHS:
@@ -66,11 +69,11 @@ def pf_run((epoch_dir, epoch_config_filename,
 
     eoparams = measure.led_params_to_EO(cf, led_params)
 
-    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
-    eo.set_params(*eoparams)
+    tr = TemplateObj()
+    tr.set_params(*eoparams)
     
-    le = likelihood.LikelihoodEvaluator(env, eo, similarity=sim_type, 
-                                        sim_params = sim_params)
+    le = likelihood.LikelihoodEvaluator2(env, tr, similarity=sim_type, 
+                                         sim_params = sim_params)
 
     model_inst = model.CustomModel(env, le, 
                                    POS_NOISE_STD=posnoise,
@@ -128,8 +131,8 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     eoparams = measure.led_params_to_EO(cf, led_params)
 
-    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
-    eo.set_params(*eoparams)
+    tr = TemplateObj()
+    tr.set_params(*eoparams)
     truth_interp, missing = measure.interpolate(truth)
 
 
@@ -244,11 +247,11 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         est_x_pix, est_y_pix = env.gc.real_to_image(est_x, est_y)
         
 
-        rendered_img = eo.render_source(est_x_pix, est_y_pix, 
-                                        est_phi, est_theta)
+        rendered_img = tr.render(est_phi, est_theta)
+                                 
 
             # now compute position of diodes
-        front_pos, back_pos = util.compute_pos(eo.length, est_x_pix, 
+        front_pos, back_pos = util.compute_pos(tr.length, est_x_pix, 
                                                est_y_pix, 
                                                est_phi, est_theta)
 
@@ -284,12 +287,12 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
 def params_render_vid():
     for p in params():
-         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".avi",))
+         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".avi",), p[6])
 
 @follows(pf_run)
 @files(params_render_vid)
 def pf_render_vid((epoch_dir, epoch_config_filename, particles_file), 
-            (vid_filename,)):
+            (vid_filename,), pix_threshold):
     
     T_DELTA = 1/30.
     
@@ -309,8 +312,8 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
     eoparams = measure.led_params_to_EO(cf, led_params)
 
-    eo = likelihood.EvaluateObj(*cf['frame_dim_pix'])
-    eo.set_params(*eoparams)
+    tr = TemplateObj()
+    tr.set_params(*eoparams)
 
     STATEVARS = ['x', 'y', 'xdot', 'ydot', 'phi', 'theta']
     # convert types
@@ -352,7 +355,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         
 
             # now compute position of diodes
-        front_pos, back_pos = util.compute_pos(eo.length, est_x_pix, 
+        front_pos, back_pos = util.compute_pos(tr.length, est_x_pix, 
                                                est_y_pix, 
                                                est_phi, est_theta)
 
@@ -362,6 +365,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
         ax_est.imshow(frames[fi], 
                   interpolation='nearest', cmap=pylab.cm.gray)
+        frames[fi][frames[fi] < pix_threshold] = 0
         ax_particles.imshow(frames[fi], 
                             interpolation='nearest', cmap=pylab.cm.gray)
 
@@ -389,7 +393,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
             
             lpx, lpy = env.gc.real_to_image(particles[fi, pi]['x'], 
                                             particles[fi, pi]['y'])
-            front_pos, back_pos = util.compute_pos(eo.length, lpx, lpy, 
+            front_pos, back_pos = util.compute_pos(tr.length, lpx, lpy, 
                                                    particles[fi, pi]['phi'], 
                                                    particles[fi, pi]['theta'])
 
