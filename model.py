@@ -1,4 +1,4 @@
-
+from ssm import models
 import numpy as np
 import drift_reject
 
@@ -10,7 +10,7 @@ DTYPE_LATENT_STATE = [('x', np.float32),
                       ('theta', np.float32)]
 
 
-class LinearModel(object):
+class LinearModel(models.BasicModel):
     """
     Right now just enough parts for the bootstrap filter. 
     All units are MKS
@@ -96,7 +96,7 @@ class LinearModel(object):
         return x_next[0]
 
 
-class LinearStudentTModel(object):
+class LinearStudentTModel(models.BasicModel):
     """
     Right now just enough parts for the bootstrap filter. 
     All units are MKS
@@ -122,6 +122,9 @@ class LinearStudentTModel(object):
         
         self.env = env
         self.likelihood_evaluator = likelihood_evaluator
+
+    def state_dtype(self):
+        return DTYPE_LATENT_STATE
 
     def sample_latent_from_prior(self, N=1):
         """
@@ -178,7 +181,7 @@ class LinearStudentTModel(object):
         
         return x_next[0]
 
-class CustomModel(object):
+class CustomModel(models.BasicModel):
     """
     Enough to do bootstrap filter, with smarter values constraining
     theta
@@ -207,6 +210,10 @@ class CustomModel(object):
         
         self.env = env
         self.likelihood_evaluator = likelihood_evaluator
+
+    def state_dtype(self):
+        return DTYPE_LATENT_STATE
+
 
     def sample_latent_from_prior(self, N=1):
         """

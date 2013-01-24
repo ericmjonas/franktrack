@@ -14,12 +14,14 @@ import organizedata
 import videotools
 import measure
 import video
+from ssm import particlefilter as pf
+import ssm
 
 from ruffus import * 
-import pf
 
 SIMILARITIES = [('dist2', 'dist', {'power' : 2}), 
-                ('dist4', 'dist', {'power' : 4})]
+                ('dist4', 'dist', {'power' : 4}), 
+                ('normcc', 'normcc', {})]
 
 FL_DATA = "data/fl"
 
@@ -97,10 +99,12 @@ def pf_run((epoch_dir, epoch_config_filename,
     y = frames
     videotools.dump_grey_movie('test.avi', y)
 
-    weights, particles = pf.particle_filter(y, model_inst, 
-                                            len(y), PARTICLEN)
+    unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
+                                      PARTICLEN)
     np.savez_compressed(outfile, 
-                        weights=weights, particles=particles)
+                        unnormed_weights=unnormed_weights, 
+                        particles=particles, 
+                        ancestors=ancestors)
 
 def params_rendered():
     for p in params():
@@ -117,7 +121,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     
     a = np.load(particles_file)
     FRAMES = 100000000
-    weights = a['weights'][:FRAMES]
+    weights = ssm.util.norm_weights(a['unnormed_weights'][:FRAMES])
     particles = a['particles'][:FRAMES]
     N = len(particles)
 
@@ -298,7 +302,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     
     a = np.load(particles_file)
     FRAMES = 100000000
-    weights = a['weights'][:FRAMES]
+    weights = ssm.util.norm_weights(a['unnormed_weights'][:FRAMES])
     particles = a['particles'][:FRAMES]
     N = len(particles)
 
