@@ -29,7 +29,7 @@ TemplateObj = template.TemplateRenderCircleBorder
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 100
+    FRAMEN = 1000
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']
 
     for epoch in EPOCHS:
