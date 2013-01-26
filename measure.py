@@ -9,6 +9,7 @@ import tarfile
 import cPickle as pickle
 from matplotlib import pylab
 import organizedata
+import scipy.signal
 
 """
 Measure various properties about the frank lab data, synthetic data, 
@@ -17,7 +18,7 @@ etc.
 
 DATA_DIR = "data/fl"
 
-FIGS_DIR = "figs"
+REPORT_DIR = "figs"
 
 def compute_xy_from_leds(positions):
     t = np.arange(0, len(positions))
@@ -68,19 +69,21 @@ def compute_phi(front, back):
     return np.unwrap(np.arctan2(d[:, 0], d[:, 1]))
 
     
-def compute_derived(positions_interp):
+def compute_derived(positions_interp, DELTA_T = 1.0):
     """
     Return velocity, phi, angular velocity
+    
+    Specify the inter-frame distance 
     
     """
     
     unwrapped_phi = compute_phi(positions_interp['led_front'], 
-                                    positions_interp['led_back'])
+                                positions_interp['led_back'])
     
-    omega = np.diff(unwrapped_phi)
+    omega = np.diff(unwrapped_phi) / DELTA_T
 
-    xdot = np.diff(positions_interp['x'])
-    ydot = np.diff(positions_interp['y'])
+    xdot = np.diff(positions_interp['x']) / DELTA_T
+    ydot = np.diff(positions_interp['y']) / DELTA_T
     
     return {'xdot' : xdot, 'ydot' : ydot, 
             'phidot' : omega, 
@@ -104,7 +107,6 @@ def detect_invalid_sep(positions, thold_std= 4):
     return np.argwhere(sep > (sep_std*thold_std + sep_mean))[:, 0]
 
 
-REPORT_DIR = "figs"
 
 @transform(os.path.join(DATA_DIR, "*/positions.npy"), 
            regex(r".+/(.+)/positions.npy$"), 
@@ -510,11 +512,66 @@ def plot_diode_params(led_params_pickle, (params_png, examples_png)):
 
     pylab.savefig(examples_png, dpi=300)
 
+
+
+@transform(os.path.join(DATA_DIR, "*/positions.npy"), 
+           regex(r".+/(.+)/positions.npy$"), 
+           [os.path.join(REPORT_DIR, 
+                         r"\1.motionstatistics.xy.png")]
+            )
+def motion_statistics(positions_file, (stats, )):
+    """
+    For each epoch, look at the distribution of the various 
+    state parameters
+
+    """
+    positions = np.load(positions_file)
+    basedir = os.path.dirname(positions_file)
+    cf = pickle.load(open(os.path.join(basedir, "config.pickle")))
+
+    invalid_sep = detect_invalid_sep(positions)
+    positions_cleaned = positions.copy()
+    positions_cleaned[invalid_sep] = ((np.nan, np.nan), 
+                                      (np.nan, np.nan), np.nan, np.nan)
+    
+    positions_interp, missing = interpolate(positions)
+    pci, cleaned_missing = interpolate(positions_cleaned)
+    pos_derived = compute_derived(pci)
+
+    vars = {'x' : pci['x'], 
+            'y' : pci['y'], 
+            'phi_unwrapped' : pos_derived['phi'], 
+            'phi' : pos_derived['phi'] % (2*np.pi), 
+            'theta' : np.zeros(10)} # fixme
+
+    f = pylab.figure()
+    N = 0
+    M = 5000
+    for vi, var in enumerate(['x', 'y','phi_unwrapped']):
+        d = vars[var][N:M]
+        vd = np.diff(d)
+        SMOOTH_N = 8
+        vd_smoothed = scipy.signal.filtfilt(np.ones(SMOOTH_N)/SMOOTH_N, 
+                                            [1.], vd)
+        ax = pylab.subplot2grid((6,1), (vi*2, 0))
+        ax.plot(d, linewidth=0.3)
+        ax.set_title(var)
+        ax2 = pylab.subplot2grid((6,1), (vi*2+1, 0))
+        ax2.plot(vd, c='r', linewidth=0.3)
+        ax2.plot(vd_smoothed, c='g', linewidth=0.3)
+        
+
+        ax2.set_ylabel(var + " vel")
+        
+    f.suptitle(basedir)
+    pylab.savefig(stats, dpi=600)
+
 if __name__ == "__main__":
     pipeline_run([agg_stats, sanity_check, difficult_regions,
-                  measure_diode_params, plot_diode_params],
+                  measure_diode_params, plot_diode_params, 
+                  motion_statistics],
                   multiprocess=4)
-    #multiprocess=4)
+
     
     
     

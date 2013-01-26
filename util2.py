@@ -105,49 +105,6 @@ class GeomConverter(object):
         x = float(pix_x) / self.pix_per_meter[1]
         return self.lower_left[1] + x, self.lower_left[0] + y
 
-        
-
-def normal_rv(x, var):
-    return np.random.normal(x, np.sqrt(var))
-
-def sample_path_from_prior(model, N):
-    """
-    returns x, y
-
-    """
-    
-    x = [model.sample_latent_from_prior()]  
-
-    y= [model.sample_obs(x[0])]
-
-    for n in range(1, N):
-        x.append(model.sample_next_latent(x[-1], n))
-        y.append(model.sample_obs(x[-1]))
-
-    return x, y
-
-def scores_to_prob(x):
-    xn = x - np.max(x)
-    a = np.exp(xn)
-    s = np.sum(a)
-    return a / s
-
-
-def log_multinorm_dens(x, mu, cov):
-    k = len(x)
-    assert len(mu) == k
-    assert cov.shape[0] == cov.shape[1]
-    assert cov.shape[0] == k
-    
-    a = -k/2.0 * np.log(2*np.pi)
-    b = -0.5 * np.log(np.linalg.det(cov))
-
-    delta = x - mu
-    inv_cov = np.linalg.inv(cov)
-    c = -0.5 * np.dot(np.dot(delta.T, inv_cov), delta)
-
-    return a + b + c
-
 def credible_interval(samples, weights, 
                       lower=0.05, upper=0.95):
     """

@@ -19,9 +19,8 @@ import ssm
 
 from ruffus import * 
 
-SIMILARITIES = [('dist2', 'dist', {'power' : 2}), 
-                ('dist4', 'dist', {'power' : 4}), 
-                ('normcc', 'normcc', {})]
+SIMILARITIES = [('dist2', 'dist', {'power' : 2}), ]
+
 
 FL_DATA = "data/fl"
 
@@ -29,12 +28,13 @@ TemplateObj = template.TemplateRenderCircleBorder
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 1000
-    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']
+    FRAMEN = 100
+    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
+              ]
 
     for epoch in EPOCHS:
-        for posnoise in [0.01 ]:
-            for velnoise in [0.01]:
+        for posnoise in [0.01, 0.001, 0.005, 0.05  ]:
+            for velnoise in [0.01, 0.001, 0.005, 0.05]:
                 for pix_threshold in [200]:
                     for sim_name, sim_type, sim_params in SIMILARITIES:
 
@@ -110,12 +110,14 @@ def params_rendered():
     for p in params():
          yield ((p[0][0], p[0][1], p[1]), (p[1] + ".png", 
                                            p[1] + ".xy.pdf", 
-                                           p[1] + ".examples.png"))
+                                           p[1] + ".examples.png", 
+                                           p[1] + ".stats.pickle"))
 
 @follows(pf_run)
 @files(params_rendered)
 def pf_plot((epoch_dir, epoch_config_filename, particles_file), 
-            (all_plot_filename, just_xy_filename, examples_filename)):
+            (all_plot_filename, just_xy_filename, examples_filename, 
+             results_pickle)):
     
     T_DELTA = 1/30.
     
@@ -151,6 +153,17 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     vals_dict = {}
 
+    # build up the dictionary of true values
+    derived_truth = measure.compute_derived(truth_interp, 
+                                            T_DELTA)
+    truth_interp_dict = {'x' : truth_interp['x'], 
+                         'y' : truth_interp['y'], 
+                         'xdot' : derived_truth['xdot'], 
+                         'ydot' : derived_truth['ydot'], 
+                         'phi' : derived_truth['phi'], 
+                         'theta' : np.zeros(len(truth_interp['x']))}
+    results = {}
+    
     pylab.figure(figsize=(8, 10))
     for vi, v in enumerate(STATEVARS):
         v_bar = np.average(vals[v], axis=1, weights=weights)
@@ -163,19 +176,21 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
         ax = pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
 
+        # plot the estimate and cred interval
         ax.plot(x, v_bar, color='b')
         ax.fill_between(x, cred[:, 0],
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
-        if v in ['x', 'y']:
-            ax.scatter(np.arange(N), truth[v][:N], 
-                          linewidth=0, s=1, c='k')
-        if v in ['xdot', 'ydot']:
-            truedelta = truth_interp[v[0]][1:(N+1)] - truth_interp[v[0]][:N]
-            ax.plot(np.arange(N), truedelta, 
-                          linewidth=1, c='k')
+        # plot truth
+        ax.plot(truth_interp_dict[v][:N], 
+                linewidth=1, c='k')
+        
+        results[v] = {'pfmean' : v_bar, 
+                      'pfcred' : cred, 
+                      'truth' : truth_interp_dict[v][:N]}
+        
         ax.grid(1)
-        ax.set_xlim((0, N))
+    pickle.dump(results, open(results_pickle, 'w'))
 
     pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
     # now plot the # of particles consuming 95% of the prob mass

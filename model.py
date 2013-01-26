@@ -207,12 +207,44 @@ class CustomModel(models.BasicModel):
         self.POS_NOISE_STD = POS_NOISE_STD
         self.PHI_NOISE_STD = 0.2 # a good chunk of noise; units? 
         self.THETA_NOISE_STD = 0.1 # 
-        
+
+        self.THETA_DRIFT_SIZE = 0.1
+        self.THETA_ENVELOPE_SIZE = np.pi / 16.0
+        self.THETA_OFFSET = np.pi/2.
         self.env = env
         self.likelihood_evaluator = likelihood_evaluator
 
     def state_dtype(self):
         return DTYPE_LATENT_STATE
+
+    def score_trans(self, x, xn, i):
+        
+        x_det = x['x'] + x['xdot'] * self.DELTA_T
+        y_det = x['y'] + x['ydot'] * self.DELTA_T
+        
+        score = 0.0
+        nd = ssm.util.log_norm_dens
+        score += nd(xn['x'], x_det, self.POS_NOISE_STD**2)
+        score += nd(xn['y'], y_det, self.POS_NOISE_STD**2)
+        
+        score += nd(xn['xdot'], x['xdot'], 
+                                        self.VELOCITY_NOISE_STD**2)
+        score += nd(xn['ydot'], x['ydot'], 
+                                        self.VELOCITY_NOISE_STD**2)
+
+        score += nd(xn['phi'], x['phi'], 
+                    self.PHI_NOISE_STD)
+
+        # now the theta likelihood is fun because it's like, the product
+        # of two things
+        t_o = x['theta'] - self.THETA_OFFSET
+        tn_o = xn['theta'] - self.THETA_OFFSET
+        score += nd(tn_o, t_n, self.THETA_DRIFT_SIZE) 
+        score += nd(tn_o, 0, self.THETA_ENVELOPE_SIZE)
+
+        # FIXME automatic validation of this somehow? generate a shit-ton
+        # of samples and then measure marginals? 
+        return score
 
 
     def sample_latent_from_prior(self, N=1):
@@ -269,13 +301,12 @@ class CustomModel(models.BasicModel):
         x_next['phi'] = np.random.normal(xn['phi'], 
                                        self.PHI_NOISE_STD, size=SN)
 
-        DRIFT_SIZE = 0.1
-        ENVELOPE_SIZE = np.pi / 16.0
-        OFFSET = np.pi/2.
-        val, failures =  drift_reject.rej_sample(xn['theta'] - OFFSET, 
-                                           DRIFT_SIZE, 
-                                           ENVELOPE_SIZE)
-        x_next['theta'] = OFFSET + val
+
+
+        val, failures =  drift_reject.rej_sample(xn['theta'] - self.THETA_OFFSET, 
+                                                 self.THETA_DRIFT_SIZE, 
+                                                 self.THETA_ENVELOPE_SIZE)
+        x_next['theta'] = self.THETA_OFFSET + val
         
         
         return x_next[0]
