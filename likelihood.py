@@ -228,7 +228,6 @@ class LikelihoodEvaluator2(object):
         if self.similarity == "dist":
             MINSCORE = -1e80
             if tr_size == 0:
-                print "RETURNING MINSCORE" 
                 return MINSCORE
             delta = (template_region - img_region.astype(np.float32))
             s = - np.sum((delta)**self.sim_params['power']) 
