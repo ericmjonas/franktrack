@@ -1,4 +1,5 @@
 from ssm import models
+import ssm
 import numpy as np
 import drift_reject
 
@@ -239,7 +240,7 @@ class CustomModel(models.BasicModel):
         # of two things
         t_o = x['theta'] - self.THETA_OFFSET
         tn_o = xn['theta'] - self.THETA_OFFSET
-        score += nd(tn_o, t_n, self.THETA_DRIFT_SIZE) 
+        score += nd(tn_o, t_o, self.THETA_DRIFT_SIZE) 
         score += nd(tn_o, 0, self.THETA_ENVELOPE_SIZE)
 
         # FIXME automatic validation of this somehow? generate a shit-ton

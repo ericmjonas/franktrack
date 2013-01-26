@@ -6,7 +6,7 @@ LENGTH = 14
 FRONT_SIZE = 3
 BACK_SIZE = 2
 
-tr = template.TemplateRenderGaussian()
+tr = template.TemplateRenderCircleBorder()
 
 tr.set_params(LENGTH, FRONT_SIZE, BACK_SIZE)
 
@@ -20,7 +20,8 @@ for theta in thetas:
         print theta, phi
         img= tr.render(phi, theta)
         ax = pylab.subplot(len(thetas), len(phis), pos)
-        ax.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+        ax.imshow(img, interpolation='nearest', cmap=pylab.cm.gray, 
+                  origin='lower')
         ax.set_xticks([])
         ax.set_yticks([])
 

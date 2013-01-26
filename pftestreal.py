@@ -16,25 +16,30 @@ import measure
 import video
 from ssm import particlefilter as pf
 import ssm
+import proposals
 
 from ruffus import * 
 
-SIMILARITIES = [('dist2', 'dist', {'power' : 2}), ]
+SIMILARITIES = [('dist2', 'dist', {'power' : 2})]
 
 
 FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
+def enlarge_sep(eo_params, amount=1.3):
+    b = eo_params[0]*amount, eo_params[1], eo_params[2]
+    return b
+
 def params():
     PARTICLEN = 1000
-    FRAMEN = 100
+    FRAMEN = 200
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
               ]
 
     for epoch in EPOCHS:
-        for posnoise in [0.01, 0.001, 0.005, 0.05  ]:
-            for velnoise in [0.01, 0.001, 0.005, 0.05]:
+        for posnoise in [0.01 ]:
+            for velnoise in [0.05]:
                 for pix_threshold in [200]:
                     for sim_name, sim_type, sim_params in SIMILARITIES:
 
@@ -69,7 +74,7 @@ def pf_run((epoch_dir, epoch_config_filename,
                             cf['frame_dim_pix'])
     led_params = pickle.load(open(led_params_filename, 'r'))
 
-    eoparams = measure.led_params_to_EO(cf, led_params)
+    eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params))
 
     tr = TemplateObj()
     tr.set_params(*eoparams)
@@ -98,9 +103,12 @@ def pf_run((epoch_dir, epoch_config_filename,
 
     y = frames
     videotools.dump_grey_movie('test.avi', y)
-
-    unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
-                                      PARTICLEN)
+    prop = proposals.HigherIsotropic()
+    unnormed_weights, particles, ancestors = pf.arbitrary_prop(y, model_inst, 
+                                                               prop, 
+                                                               PARTICLEN)
+    #unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
+    #                                                      PARTICLEN)
     np.savez_compressed(outfile, 
                         unnormed_weights=unnormed_weights, 
                         particles=particles, 
@@ -135,7 +143,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
                             cf['frame_dim_pix'])
     led_params = pickle.load(open(led_params_filename, 'r'))
 
-    eoparams = measure.led_params_to_EO(cf, led_params)
+    eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params))
 
     tr = TemplateObj()
     tr.set_params(*eoparams)
@@ -329,7 +337,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                             cf['frame_dim_pix'])
     led_params = pickle.load(open(led_params_filename, 'r'))
 
-    eoparams = measure.led_params_to_EO(cf, led_params)
+    eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params))
 
     tr = TemplateObj()
     tr.set_params(*eoparams)
