@@ -27,13 +27,13 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.3):
+def enlarge_sep(eo_params, amount=1.0):
     b = eo_params[0]*amount, eo_params[1], eo_params[2]
     return b
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 200
+    FRAMEN = 500
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
               ]
 
@@ -107,7 +107,7 @@ def pf_run((epoch_dir, epoch_config_filename,
     unnormed_weights, particles, ancestors = pf.arbitrary_prop(y, model_inst, 
                                                                prop, 
                                                                PARTICLEN)
-    #unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
+    # unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
     #                                                      PARTICLEN)
     np.savez_compressed(outfile, 
                         unnormed_weights=unnormed_weights, 
@@ -219,6 +219,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     for vi, v in enumerate(['x', 'y']):
         v_bar = np.average(vals[v], axis=1, weights=weights)
+        truth_interp = truth_interp_dict[v][:N]
         x = np.arange(0, len(v_bar))
         cred = np.zeros((len(x), 2), dtype=np.float)
         for ci, (p, w) in enumerate(zip(vals[v], weights)):
@@ -229,13 +230,15 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         ax.fill_between(x, cred[:, 0],
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
-        ax.scatter(np.arange(N), truth[v][:N], 
-                   linewidth=0, s=2, c='k')
+        ax.plot(truth_interp, 
+                linewidth=1,  c='k')
         for i in np.argwhere(np.isnan(truth[v][:N])):
             ax.axvline(i, c='r', linewidth=0.1, alpha=0.5)
 
         ax.grid(1)
         ax.set_xlim((0, N))
+        ax.set_ylim((np.min(truth_interp), 
+                     np.max(truth_interp)))
         ax.set_xlabel("time (frames)")
         ax.set_ylabel("position (m)")
     f2.suptitle(just_xy_filename)
@@ -450,4 +453,4 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     for f in plot_temp_filenames:
         os.remove(f)
 
-pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=4)
+pipeline_run([pf_run, pf_plot, pf_render_vid])# , multiprocess=4)
