@@ -66,7 +66,7 @@ def compute_phi(front, back):
     
     """
     d = front - back
-    return np.unwrap(np.arctan2(d[:, 0], d[:, 1]))
+    return np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
 
     
 def compute_derived(positions_interp, DELTA_T = 1.0):

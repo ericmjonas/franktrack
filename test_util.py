@@ -106,4 +106,3 @@ def test_render_hat():
     for s, f in zip(slows, fasts):
         assert_allclose(s, f)
 
-        

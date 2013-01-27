@@ -20,7 +20,9 @@ import proposals
 
 from ruffus import * 
 
-SIMILARITIES = [('dist2', 'dist', {'power' : 2})]
+T_DELTA = 1/30.
+
+SIMILARITIES = [('dist2', 'dist', {'power' : 1})]
 
 
 FL_DATA = "data/fl"
@@ -33,7 +35,7 @@ def enlarge_sep(eo_params, amount=1.0):
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 500
+    FRAMEN = 1000
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
               ]
 
@@ -127,7 +129,6 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
             (all_plot_filename, just_xy_filename, examples_filename, 
              results_pickle)):
     
-    T_DELTA = 1/30.
     
     a = np.load(particles_file)
     FRAMES = 100000000
@@ -157,7 +158,10 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         for v in STATEVARS:
             vals[v].append([s[v] for s in p])
     for v in STATEVARS:
-        vals[v] = np.array(vals[v])
+        if v == 'phi':
+            vals[v] = np.array(vals[v]) % (2*np.pi)
+        else:
+            vals[v] = np.array(vals[v])
 
     vals_dict = {}
 
@@ -168,7 +172,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
                          'y' : truth_interp['y'], 
                          'xdot' : derived_truth['xdot'], 
                          'ydot' : derived_truth['ydot'], 
-                         'phi' : derived_truth['phi'], 
+                         'phi' : derived_truth['phi'] % (2*np.pi), 
                          'theta' : np.zeros(len(truth_interp['x']))}
     results = {}
     
@@ -176,7 +180,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     for vi, v in enumerate(STATEVARS):
         v_bar = np.average(vals[v], axis=1, weights=weights)
         vals_dict[v] = v_bar
-
+        v_truth_interp = truth_interp_dict[v][:N]
         x = np.arange(0, len(v_bar))
         cred = np.zeros((len(x), 2), dtype=np.float)
         for ci, (p, w) in enumerate(zip(vals[v], weights)):
@@ -190,12 +194,15 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
         # plot truth
-        ax.plot(truth_interp_dict[v][:N], 
+        ax.plot(v_truth_interp, 
                 linewidth=1, c='k')
         
+        ax.set_ylim(np.min(v_truth_interp)-0.1, 
+                    np.max(v_truth_interp) + 0.1)
+
         results[v] = {'pfmean' : v_bar, 
                       'pfcred' : cred, 
-                      'truth' : truth_interp_dict[v][:N]}
+                      'truth' : v_truth_interp}
         
         ax.grid(1)
     pickle.dump(results, open(results_pickle, 'w'))
@@ -324,8 +331,6 @@ def params_render_vid():
 def pf_render_vid((epoch_dir, epoch_config_filename, particles_file), 
             (vid_filename,), pix_threshold):
     
-    T_DELTA = 1/30.
-    
     a = np.load(particles_file)
     FRAMES = 100000000
     weights = ssm.util.norm_weights(a['unnormed_weights'][:FRAMES])
@@ -354,6 +359,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     for v in STATEVARS:
         vals[v] = np.array(vals[v])
 
+
     vals_dict = {}
 
     for vi, v in enumerate(STATEVARS):
@@ -364,7 +370,10 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                                      np.arange(N))
     truth, missing = measure.interpolate(truth)
 
-    WINDOW_PIX = 60
+    derived_truth = measure.compute_derived(truth, 
+                                            T_DELTA)
+
+    WINDOW_PIX = 40
     f = pylab.figure()
     ax_est = pylab.subplot(1,2, 1)
     ax_particles = pylab.subplot(1, 2, 2)
@@ -372,8 +381,10 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     for fi in range(N):
         ax_est.clear()
         ax_particles.clear()
+
         true_x = truth['x'][fi]
         true_y = truth['y'][fi]
+        true_phi = derived_truth['phi'][fi]
         true_x_pix, true_y_pix = env.gc.real_to_image(true_x, true_y)
 
         est_x  = vals_dict['x'][fi]
@@ -388,6 +399,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         front_pos, back_pos = util.compute_pos(tr.length, est_x_pix, 
                                                est_y_pix, 
                                                est_phi, est_theta)
+
 
         cir = pylab.Circle(front_pos, radius=eoparams[1],  
                            ec='g', fill=False,
@@ -453,4 +465,4 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     for f in plot_temp_filenames:
         os.remove(f)
 
-pipeline_run([pf_run, pf_plot, pf_render_vid])# , multiprocess=4)
+pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=4)

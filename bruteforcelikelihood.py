@@ -41,7 +41,7 @@ LIKELIHOOD_SETTING = [{'similarity' : 'dist'},
 def params():
     EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2']# , 'bukowski_04.W2', 
     #'bukowski_04.C', 'bukowski_04.linear']
-    FRAMES = np.arange(10)*100
+    FRAMES = np.arange(20)
     
     for epoch in EPOCHS:
         for frame in FRAMES:

@@ -166,7 +166,7 @@ class LikelihoodEvaluator(object):
         pi_pix = proposed_img*255
 
         if self.similarity == "dist":
-            delta = (pi_pix - img.astype(np.float32))
+            delta = np.abs((pi_pix - img.astype(np.float32)))
             s = - np.sum((delta)**self.sim_params['power'])
         elif self.similarity == "normcc":
             """

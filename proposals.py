@@ -23,13 +23,12 @@ class HigherIsotropic(ssm.proposal.Proposal):
         self.DELTA_T = 1/30. 
         self.VELOCITY_NOISE_STD = 0.05
         self.POS_NOISE_STD = 0.01
-        self.PHI_NOISE_STD = 1.0 # a good chunk of noise; units? 
+        self.PHI_NOISE_STD = 0.3 # a good chunk of noise; units? 
 
-        self.THETA_DRIFT_SIZE = 0.1
-        self.THETA_ENVELOPE_SIZE = np.pi/16.
+        self.THETA_DRIFT_SIZE = 0.01
+        self.THETA_ENVELOPE_SIZE = np.pi/32.
         self.THETA_OFFSET = np.pi/2.
 
-    @profile
     def sample(self, y, x_prev, n):
         """
         draw a sample from the proposal conditioned on current y and

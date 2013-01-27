@@ -158,7 +158,7 @@ class TemplateRenderCircleBorder(object):
 
         front_pos = pos_to_int(front_pos)
         back_pos = pos_to_int(back_pos)
-        BORDER = 0.4
+        BORDER = 0.6
         for i, size, pos in [(0, self.front_size, front_pos), 
                              (1, self.back_size, back_pos)]:
             template[i] = util.render_hat_ma_fast(H, W, pos[1], pos[0], 
