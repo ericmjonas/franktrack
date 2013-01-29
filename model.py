@@ -192,7 +192,8 @@ class CustomModel(models.BasicModel):
     
     def __init__(self, env, likelihood_evaluator, 
                  VELOCITY_NOISE_STD = 0.1, 
-                 POS_NOISE_STD = 0.01):
+                 POS_NOISE_STD = 0.01, 
+                 PHI_NOISE_STD = 0.2):
         """
         This is a basic linear evolution model with
         a generative model for the observation likelihood. 
@@ -206,7 +207,7 @@ class CustomModel(models.BasicModel):
         self.DELTA_T = 1/30. 
         self.VELOCITY_NOISE_STD = VELOCITY_NOISE_STD
         self.POS_NOISE_STD = POS_NOISE_STD
-        self.PHI_NOISE_STD = 0.2 # a good chunk of noise; units? 
+        self.PHI_NOISE_STD = PHI_NOISE_STD
         self.THETA_NOISE_STD = 0.1 # 
 
         self.THETA_DRIFT_SIZE = 0.01

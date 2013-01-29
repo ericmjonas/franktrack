@@ -139,62 +139,6 @@ class EvaluateObj(object):
         return subimg
 
 
-class LikelihoodEvaluator(object):
-    def __init__(self, env, evaluate_obj, similarity = 'dist', 
-                 sim_params = None):
-        self.env = env
-        self.evaluate_obj = evaluate_obj
-        self.similarity = similarity
-        if sim_params == None:
-            self.sim_params = {'power' : 2}
-        else:
-            self.sim_params = sim_params
-
-    def score_state(self, state, img):
-        return self.score_state_full(state, img)
-
-    def score_state_full(self, state, img):
-        x = state['x']
-        y = state['y']
-
-        theta = state['theta']
-        phi = state['phi']
-        x_pix, y_pix = self.env.gc.real_to_image(x, y)
-
-        proposed_img = self.evaluate_obj.render_source(x_pix, y_pix,
-                                                       phi, theta)
-        pi_pix = proposed_img*255
-
-        if self.similarity == "dist":
-            delta = np.abs((pi_pix - img.astype(np.float32)))
-            s = - np.sum((delta)**self.sim_params['power'])
-        elif self.similarity == "normcc":
-            """
-            Normalized cross-correlation
-            http://en.wikipedia.org/wiki/Cross-correlation#Normalized_cross-correlation
-            """
-            imgf  = img.astype(np.float32)
-            imgf_mean = np.mean(imgf)
-            imgf_var = np.var(imgf)
-            if imgf_var < 1e-10:
-                imgf_var = 1e-10
-
-            pi_pix_mean = np.mean(pi_pix)
-            pi_pix_var = np.var(pi_pix)
-            if pi_pix_var < 1e-10:
-                pi_pix_var = 1e-10
-
-            s = np.sum((imgf - imgf_mean)*(pi_pix - pi_pix_mean))
-            s = s / (np.sqrt(imgf_var * pi_pix_var))
-            s = s / (len(proposed_img.flat))
-            return s
-
-        else:
-            raise NotImplemented()
-
-        
-        return s
-
 class LikelihoodEvaluator2(object):
     def __init__(self, env, template_obj, similarity = 'dist', 
                  sim_params = None):
@@ -252,6 +196,8 @@ class LikelihoodEvaluator2(object):
 
             s = s / (template_std * img_std)
             s = s / tr_size
+            if 'scalar' in self.sim_params:
+                s = s * self.sim_params['scalar']
 
             if not np.isfinite(s):
                 return MINSCORE

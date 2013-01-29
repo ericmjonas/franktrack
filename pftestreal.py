@@ -22,7 +22,14 @@ from ruffus import *
 
 T_DELTA = 1/30.
 
-SIMILARITIES = [('dist2', 'dist', {'power' : 1})]
+SIMILARITIES = [('dist1', 'dist', {'power' : 1}),
+                ('dist2', 'dist', {'power' : 2}), 
+                ('normcc1', 'normcc', {'scalar' : 1}), 
+                ('normcc2', 'normcc', {'scalar' : 2}), 
+                ('normcc4', 'normcc', {'scalar' : 4}), 
+                ('normcc10', 'normcc', {'scalar' : 10}), 
+                ('normcc20', 'normcc', {'scalar' : 20}), 
+                ]
 
 
 FL_DATA = "data/fl"
@@ -35,14 +42,18 @@ def enlarge_sep(eo_params, amount=1.0):
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 1000
-    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
+    FRAMEN = 40
+    EPOCHS = ['bukowski_04.W1', 
+              'bukowski_04.W2', 
+              'bukowski_03.W1', 'bukowski_03.W2', 
+              'bukowski_04.C', 'bukowski_03.C', 
+              'bukowski_03.linear', 'bukowski_04.linear'
               ]
 
     for epoch in EPOCHS:
-        for posnoise in [0.01 ]:
+        for posnoise in [0.01]:
             for velnoise in [0.05]:
-                for pix_threshold in [200]:
+                for pix_threshold in [0, 200]:
                     for sim_name, sim_type, sim_params in SIMILARITIES:
 
                         infile = [os.path.join(FL_DATA, epoch), 
@@ -314,8 +325,8 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
             ax.scatter([lpx], [lpy], c=color)
 
 
-        ax.set_xlim((true_x_pix - WINDOW_PIX, true_x_pix + WINDOW_PIX))
-        ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
+        #ax.set_xlim((true_x_pix - WINDOW_PIX, true_x_pix + WINDOW_PIX))
+        #ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_title(error_frame_i)
@@ -465,4 +476,4 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     for f in plot_temp_filenames:
         os.remove(f)
 
-pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=4)
+pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=5)
