@@ -145,6 +145,7 @@ class LikelihoodEvaluator2(object):
         self.env = env
         self.template_obj = template_obj
         self.similarity = similarity
+        print "sim_params=", sim_params
         if sim_params == None:
             self.sim_params = {'power' : 2}
         else:
@@ -198,10 +199,9 @@ class LikelihoodEvaluator2(object):
             s = s / tr_size
             if 'scalar' in self.sim_params:
                 s = s * self.sim_params['scalar']
-
             if not np.isfinite(s):
                 return MINSCORE
-        
+
         return s
 
 class DiodeGeom(object):

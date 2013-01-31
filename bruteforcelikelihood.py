@@ -24,7 +24,7 @@ import template
 from ruffus import * 
 import pf
 
-PIX_THRESHOLD = 200
+PIX_THRESHOLD = 0
 FL_DATA = "data/fl"
 
 X_GRID_NUM = 150
@@ -35,14 +35,18 @@ THETA_GRID_NUM =  6
 USE_CLOUD = True
 #cloud.start_simulator()
 
-LIKELIHOOD_SETTING = [{'similarity' : 'dist'}, 
-                      {'similarity' : 'normcc'}]
+LIKELIHOOD_SETTING = [{'similarity' : 'dist',
+                       'sim_params' : {'power' : 1}}, 
+                      {'similarity' : 'normcc', 
+                       'sim_params' : {'scalar': 10}}]
 
 def params():
-    EPOCHS = ['bukowski_04.W1', 'bukowski_04.W2', 
-              'bukowski_03.W1', 'bukowski_03.W2', 
-              'bukowski_04.C', 'bukowski_03.C', 
-              'bukowski_03.linear', 'bukowski_04.linear']
+    EPOCHS = [#'bukowski_04.W1', 'bukowski_04.W2', 
+              #'bukowski_03.W1', 
+              'bukowski_03.W2', 
+              #'bukowski_04.C', 'bukowski_03.C', 
+              #'bukowski_03.linear', 'bukowski_04.linear'
+              ]
 
     #'bukowski_04.C', 'bukowski_04.linear']
     FRAMES = np.arange(10)
@@ -54,7 +58,7 @@ def params():
                           os.path.join(FL_DATA, epoch, 'config.pickle'), 
                           os.path.join(FL_DATA, epoch, 'framehist.npz'), 
                           ]
-                basename = '%s.likelihoodscores.%02d.%05d' % (epoch, likelihood_i, frame)
+                basename = '%s.likelihoodscores.%02d.%05d.%d' % (epoch, likelihood_i, frame, PIX_THRESHOLD)
                 outfiles = [basename + ".wait.pickle", 
                             basename + ".wait.npz"]
 
@@ -318,7 +322,8 @@ def picloud_score_frame(dataset_name, x_range, y_range, phi_range, theta_range,
     tp.set_params(*EO_PARAMS)
     ls = LIKELIHOOD_SETTING[likelihood_i]
     
-    le = likelihood.LikelihoodEvaluator2(env, tp, similarity=ls['similarity'])
+    le = likelihood.LikelihoodEvaluator2(env, tp, similarity=ls['similarity'], 
+                                         sim_params = ls['sim_params'])
 
     frames = organizedata.get_frames(dataset_dir, np.array([frame]))
     frame = frames[0]

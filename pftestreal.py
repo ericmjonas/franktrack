@@ -23,12 +23,12 @@ from ruffus import *
 T_DELTA = 1/30.
 
 SIMILARITIES = [('dist1', 'dist', {'power' : 1}),
-                ('dist2', 'dist', {'power' : 2}), 
-                ('normcc1', 'normcc', {'scalar' : 1}), 
-                ('normcc2', 'normcc', {'scalar' : 2}), 
-                ('normcc4', 'normcc', {'scalar' : 4}), 
-                ('normcc10', 'normcc', {'scalar' : 10}), 
-                ('normcc20', 'normcc', {'scalar' : 20}), 
+                #('dist2', 'dist', {'power' : 2}), 
+                #('normcc1', 'normcc', {'scalar' : 1}), 
+                #('normcc2', 'normcc', {'scalar' : 2}), 
+                #('normcc4', 'normcc', {'scalar' : 4}), 
+                #('normcc10', 'normcc', {'scalar' : 10}), 
+                ('normcc50', 'normcc', {'scalar' : 50}), 
                 ]
 
 
@@ -42,10 +42,11 @@ def enlarge_sep(eo_params, amount=1.0):
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 40
+    FRAMEN = 2000
     EPOCHS = ['bukowski_04.W1', 
               'bukowski_04.W2', 
-              'bukowski_03.W1', 'bukowski_03.W2', 
+              'bukowski_03.W1', 
+              'bukowski_03.W2', 
               'bukowski_04.C', 'bukowski_03.C', 
               'bukowski_03.linear', 'bukowski_04.linear'
               ]
@@ -102,15 +103,22 @@ def pf_run((epoch_dir, epoch_config_filename,
     frames = organizedata.get_frames(epoch_dir, np.arange(FRAMEN))
     for fi, f in enumerate(frames):
         frames[fi][frames[fi] < pix_threshold] = 0
-        pix_ul = env.gc.real_to_image(region['x_pos_min'], 
-                                   region['y_pos_min'])
+        pix_ul = list(env.gc.real_to_image(region['x_pos_min'], 
+                                           region['y_pos_min']))
+        if pix_ul[1] <0 :
+            pix_ul[1] = 0
+        if pix_ul[0] < 0:
+            pix_ul[0] = 0
+
         frames[fi][:pix_ul[1], :] = 0
         frames[fi][:, :pix_ul[0]] = 0
 
         pix_lr = env.gc.real_to_image(region['x_pos_max'], 
                                    region['y_pos_max'])
+        
         frames[fi][pix_lr[1]:, :] = 0
         frames[fi][:, pix_lr[0]:] = 0
+
 
         
 
@@ -476,4 +484,4 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     for f in plot_temp_filenames:
         os.remove(f)
 
-pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=5)
+pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=4)
