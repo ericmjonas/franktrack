@@ -22,7 +22,7 @@ from ruffus import *
 
 T_DELTA = 1/30.
 
-SIMILARITIES = [('dist1', 'dist', {'power' : 1}),
+LIKELIHOOD_CONFIGS = [('dist1', 'dist', {'power' : 1}),
                 #('dist2', 'dist', {'power' : 2}), 
                 #('normcc1', 'normcc', {'scalar' : 1}), 
                 #('normcc2', 'normcc', {'scalar' : 2}), 
@@ -55,7 +55,7 @@ def params():
         for posnoise in [0.01]:
             for velnoise in [0.05]:
                 for pix_threshold in [0]:
-                    for sim_name, sim_type, sim_params in SIMILARITIES:
+                    for likeli_name, likeli_type, likeli_params in LIKELIHOOD_CONFIGS:
 
                         infile = [os.path.join(FL_DATA, epoch), 
                                   os.path.join(FL_DATA, epoch, 'config.pickle'), 
@@ -63,11 +63,11 @@ def params():
                                   os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
                                   ]
 
-                        outfile = 'particles.%s.%s.%f.%f.%d.%d.%d.npz' % (epoch, sim_name, posnoise, 
+                        outfile = 'particles.%s.%s.%f.%f.%d.%d.%d.npz' % (epoch, likeli_name, posnoise, 
                                                                        velnoise, pix_threshold, 
                                                                        PARTICLEN, FRAMEN)
 
-                        yield (infile, outfile, epoch, (sim_name, sim_type, sim_params), 
+                        yield (infile, outfile, epoch, (likeli_name, likeli_type, likeli_params), 
                                posnoise, velnoise, pix_threshold, 
                                PARTICLEN, FRAMEN)
            
@@ -75,7 +75,7 @@ def params():
 @files(params)
 def pf_run((epoch_dir, epoch_config_filename, 
             region_filename, led_params_filename), outfile, 
-           epoch, (sim_name, sim_type, sim_params), 
+           epoch, (likeli_name, likeli_type, likeli_params), 
            posnoise, 
            velnoise, pix_threshold, PARTICLEN, 
            FRAMEN):
@@ -93,8 +93,8 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr = TemplateObj()
     tr.set_params(*eoparams)
     
-    # le = likelihood.LikelihoodEvaluator2(env, tr, similarity=sim_type, 
-    #                                      sim_params = sim_params)
+    # le = likelihood.LikelihoodEvaluator2(env, tr, similarity=likeli_type, 
+    #                                      likeli_params = likeli_params)
 
     le = likelihood.LikelihoodEvaluator3(env, tr)
 
