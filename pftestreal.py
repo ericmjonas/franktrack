@@ -28,7 +28,7 @@ SIMILARITIES = [('dist1', 'dist', {'power' : 1}),
                 #('normcc2', 'normcc', {'scalar' : 2}), 
                 #('normcc4', 'normcc', {'scalar' : 4}), 
                 #('normcc10', 'normcc', {'scalar' : 10}), 
-                ('normcc50', 'normcc', {'scalar' : 50}), 
+                #('normcc50', 'normcc', {'scalar' : 50}), 
                 ]
 
 
@@ -54,7 +54,7 @@ def params():
     for epoch in EPOCHS:
         for posnoise in [0.01]:
             for velnoise in [0.05]:
-                for pix_threshold in [0, 200]:
+                for pix_threshold in [0]:
                     for sim_name, sim_type, sim_params in SIMILARITIES:
 
                         infile = [os.path.join(FL_DATA, epoch), 
@@ -93,8 +93,10 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr = TemplateObj()
     tr.set_params(*eoparams)
     
-    le = likelihood.LikelihoodEvaluator2(env, tr, similarity=sim_type, 
-                                         sim_params = sim_params)
+    # le = likelihood.LikelihoodEvaluator2(env, tr, similarity=sim_type, 
+    #                                      sim_params = sim_params)
+
+    le = likelihood.LikelihoodEvaluator3(env, tr)
 
     model_inst = model.CustomModel(env, le, 
                                    POS_NOISE_STD=posnoise,

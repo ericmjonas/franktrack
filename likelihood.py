@@ -1,5 +1,8 @@
 import numpy as np
 import scipy.ndimage
+
+import skimage.measure
+import skimage.feature
 # import pyximport;
 
 # pyximport.install(setup_args={'include_dirs': np.get_include()})
@@ -209,6 +212,44 @@ class DiodeGeom(object):
         self.length = length
         self.fr = front_radius 
         self.br = back_radius
+
+
+class LikelihoodEvaluator3(object):
+    def __init__(self, env, template_obj):
+
+        self.env = env
+        self.template_obj = template_obj
+        self.img_cache = None
+
+    def score_state(self, state, img):
+        return self.score_state_full(state, img)
+
+    def score_state_full(self, state, img):
+        assert len(img.shape)== 2
+        x = state['x']
+        y = state['y']
+        theta = state['theta']
+        phi = state['phi']
+
+        if self.img_cache == None or (self.img_cache != img).any():
+            self.img_cache = img.copy()
+            self.coordinates = skimage.feature.peak_local_max(img, min_distance=10, 
+                                                              threshold_abs=200)
+            
+        
+        # get the points 
+        coordinates = self.coordinates
+        
+
+        x_pix, y_pix = self.env.gc.real_to_image(x, y)
+        x_pix = int(x_pix)
+        y_pix = int(y_pix)
+        
+        front_pos_pix, back_pos_pix = util.compute_pos(self.template_obj.length, 
+                                                       x_pix, y_pix, phi, theta)
+        front_delta = np.sum(np.abs((coordinates - np.array(front_pos_pix)[:2][::-1])))
+        back_delta = np.sum(np.abs((coordinates - np.array(back_pos_pix)[:2][::-1])))
+        return - np.log((front_delta + back_delta)/len(coordinates))
 
 if __name__ == "__main__":
     eo = EvaluateObj(320, 240)

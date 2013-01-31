@@ -93,3 +93,36 @@ def test_likelihood_evaluator2():
     pylab.imshow(res)
     pylab.colorbar()
     pylab.show()
+
+def test_likelihood_evaluator3():
+    
+    tr = template.TemplateRenderCircleBorder()
+    tr.set_params(14, 6, 4)
+
+    t1 = tr.render(0, np.pi/2)
+    img = np.zeros((240, 320), dtype=np.uint8)
+
+    env = util.Environmentz((1.5, 2.0), (240, 320))
+    
+    le2 = likelihood.LikelihoodEvaluator3(env, tr)
+
+    img[(120-t1.shape[0]/2):(120+t1.shape[0]/2), 
+        (160-t1.shape[1]/2):(160+t1.shape[1]/2)] += t1 *255
+    pylab.subplot(1, 2, 1)
+    pylab.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+
+    state = np.zeros(1, dtype=util.DTYPE_STATE)
+
+    xvals = np.linspace(0, 2.,  100)
+    yvals = np.linspace(0, 1.5, 100)
+    res = np.zeros((len(yvals), len(xvals)), dtype=np.float32)
+    for yi, y in enumerate(yvals):
+        for xi, x in enumerate(xvals):
+            state[0]['x'] = x
+            state[0]['y'] = y
+            state[0]['theta'] = np.pi / 2. 
+            res[yi, xi] =     le2.score_state(state, img)
+    pylab.subplot(1, 2, 2)
+    pylab.imshow(res)
+    pylab.colorbar()
+    pylab.show()
