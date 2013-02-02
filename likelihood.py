@@ -215,11 +215,17 @@ class DiodeGeom(object):
 
 
 class LikelihoodEvaluator3(object):
-    def __init__(self, env, template_obj):
+    def __init__(self, env, template_obj, params=None):
 
         self.env = env
         self.template_obj = template_obj
         self.img_cache = None
+        if params == None:
+            self.params = {'log' : False, 
+                           'power' : 1, 
+                           'normalize' : False}
+        else:
+            self.params = params
 
     def score_state(self, state, img):
         return self.score_state_full(state, img)
@@ -247,9 +253,19 @@ class LikelihoodEvaluator3(object):
         
         front_pos_pix, back_pos_pix = util.compute_pos(self.template_obj.length, 
                                                        x_pix, y_pix, phi, theta)
-        front_delta = np.sum(np.abs((coordinates - np.array(front_pos_pix)[:2][::-1])))
-        back_delta = np.sum(np.abs((coordinates - np.array(back_pos_pix)[:2][::-1])))
-        return - np.log((front_delta + back_delta)/len(coordinates))
+        front_deltas = np.abs((coordinates - np.array(front_pos_pix)[:2][::-1]))
+        back_deltas = np.abs((coordinates - np.array(back_pos_pix)[:2][::-1]))
+        power = self.params.get('power', 1)
+        
+        delta_sum = np.sum(front_deltas**power) + np.sum(back_deltas**power)
+        if self.params.get('normalize', True):
+            delta_sum = delta_sum / len(coordinates)
+        if self.params.get('log', False):
+            score = -np.log(delta_sum)
+        else:
+            score = -delta_sum
+
+        return score
 
 if __name__ == "__main__":
     eo = EvaluateObj(320, 240)

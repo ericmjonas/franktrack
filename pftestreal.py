@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats
+import pandas
 import cPickle as pickle
 import likelihood
 import util2 as util
@@ -22,13 +23,17 @@ from ruffus import *
 
 T_DELTA = 1/30.
 
-LIKELIHOOD_CONFIGS = [('dist1', 'dist', {'power' : 1}),
-                #('dist2', 'dist', {'power' : 2}), 
-                #('normcc1', 'normcc', {'scalar' : 1}), 
-                #('normcc2', 'normcc', {'scalar' : 2}), 
-                #('normcc4', 'normcc', {'scalar' : 4}), 
-                #('normcc10', 'normcc', {'scalar' : 10}), 
-                #('normcc50', 'normcc', {'scalar' : 50}), 
+LIKELIHOOD_CONFIGS = [('le1', {'power' : 1, 'log' : False, 'normalize' : False}),
+                      ('le2', {'power' : 2, 'log' : False, 'normalize' : False}),
+                      ('le3', {'power' : 10, 'log' : False, 'normalize' : False}),
+                      ('le4', {'power' : 1, 'log' : False, 'normalize' : True}),
+                      ('le5', {'power' : 2, 'log' : False, 'normalize' : True}),
+                      ('le6', {'power' : 10, 'log' : False, 'normalize' : True}),
+                      ('le7', {'power' : 1, 'log' : True, 'normalize' : False}),
+                      ('le8', {'power' : 1, 'log' : True, 'normalize' : True}),
+                      ('le9', {'power' : 2, 'log' : True, 'normalize' : True}),
+                      ('le10', {'power' : 2, 'log' : True, 'normalize' : False}),
+                      ('le11', {'power' : 10, 'log' : True, 'normalize' : True}),
                 ]
 
 
@@ -42,20 +47,22 @@ def enlarge_sep(eo_params, amount=1.0):
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 2000
+    FRAMEN = 1000
     EPOCHS = ['bukowski_04.W1', 
               'bukowski_04.W2', 
               'bukowski_03.W1', 
               'bukowski_03.W2', 
-              'bukowski_04.C', 'bukowski_03.C', 
-              'bukowski_03.linear', 'bukowski_04.linear'
+              'bukowski_04.C', 
+              'bukowski_03.C', 
+              'bukowski_03.linear', 
+              'bukowski_04.linear'
               ]
 
     for epoch in EPOCHS:
         for posnoise in [0.01]:
             for velnoise in [0.05]:
                 for pix_threshold in [0]:
-                    for likeli_name, likeli_type, likeli_params in LIKELIHOOD_CONFIGS:
+                    for likeli_name, likeli_params in LIKELIHOOD_CONFIGS:
 
                         infile = [os.path.join(FL_DATA, epoch), 
                                   os.path.join(FL_DATA, epoch, 'config.pickle'), 
@@ -67,7 +74,8 @@ def params():
                                                                        velnoise, pix_threshold, 
                                                                        PARTICLEN, FRAMEN)
 
-                        yield (infile, outfile, epoch, (likeli_name, likeli_type, likeli_params), 
+                        yield (infile, outfile, epoch, 
+                               (likeli_name,  likeli_params), 
                                posnoise, velnoise, pix_threshold, 
                                PARTICLEN, FRAMEN)
            
@@ -75,7 +83,7 @@ def params():
 @files(params)
 def pf_run((epoch_dir, epoch_config_filename, 
             region_filename, led_params_filename), outfile, 
-           epoch, (likeli_name, likeli_type, likeli_params), 
+           epoch, (likeli_name, likeli_params), 
            posnoise, 
            velnoise, pix_threshold, PARTICLEN, 
            FRAMEN):
@@ -96,7 +104,7 @@ def pf_run((epoch_dir, epoch_config_filename,
     # le = likelihood.LikelihoodEvaluator2(env, tr, similarity=likeli_type, 
     #                                      likeli_params = likeli_params)
 
-    le = likelihood.LikelihoodEvaluator3(env, tr)
+    le = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
 
     model_inst = model.CustomModel(env, le, 
                                    POS_NOISE_STD=posnoise,
@@ -142,13 +150,14 @@ def params_rendered():
          yield ((p[0][0], p[0][1], p[1]), (p[1] + ".png", 
                                            p[1] + ".xy.pdf", 
                                            p[1] + ".examples.png", 
-                                           p[1] + ".stats.pickle"))
+                                           p[1] + ".stats.pickle"), 
+                                           p[2:])
 
 @follows(pf_run)
 @files(params_rendered)
 def pf_plot((epoch_dir, epoch_config_filename, particles_file), 
             (all_plot_filename, just_xy_filename, examples_filename, 
-             results_pickle)):
+             results_pickle), other_params):
     
     
     a = np.load(particles_file)
@@ -226,7 +235,11 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
                       'truth' : v_truth_interp}
         
         ax.grid(1)
-    pickle.dump(results, open(results_pickle, 'w'))
+    # this should probably be a separate chunk of the pipeline, 
+    # but whatever
+    pickle.dump({'params' : other_params, 
+                 'variables' : results}, 
+                open(results_pickle, 'w'))
 
     pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
     # now plot the # of particles consuming 95% of the prob mass
@@ -486,4 +499,30 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     for f in plot_temp_filenames:
         os.remove(f)
 
-pipeline_run([pf_run, pf_plot, pf_render_vid], multiprocess=4)
+@merge(pf_plot, 'particles.summary.pickle')
+def results_summarize(infiles, summary_file):
+    df_rows = []
+    for infile in infiles:
+        stats_filename = infile[-1]
+        data = pickle.load(open(stats_filename, 'r'))
+        for var_name, var_data in data['variables'].iteritems():
+            dp = data['params']
+            d = {'epoch' : dp[0], 
+                 'likelihood_name' : dp[1][0], 
+                 'likelihood_power' : dp[1][1]['power'], 
+                 'likelihood_log' : dp[1][1]['log'], 
+                 'likelihood_normalize' : dp[1][1]['normalize'], 
+                 'posnoise' : dp[2], 
+                 'velnoise' : dp[3], 
+                 'pix_threshold' : dp[4], 
+                 'particlen' : dp[5], 
+                 'framen' : dp[6], 
+                 'variable' : var_name, 
+                 'pfmean' : var_data['pfmean'], 
+                 'pfcred' : var_data['pfcred'], 
+                 'truth' : var_data['truth']}
+            df_rows.append(d)
+    df = pandas.DataFrame(df_rows)
+    pickle.dump(df, open(summary_file, 'w'))
+
+pipeline_run([pf_run, pf_plot, pf_render_vid, results_summarize], multiprocess=4)
