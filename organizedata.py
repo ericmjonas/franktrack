@@ -11,9 +11,9 @@ from matplotlib import pylab
 
 import pyximport;
 
-#pyximport.install(setup_args={'include_dirs': np.get_include()})
+pyximport.install(setup_args={'include_dirs': np.get_include()})
 
-#import cutil
+import cutil
 
 
 import scipy.ndimage
@@ -43,21 +43,24 @@ def generate_files_fl():
     # walter's data
 
     WALTER_BASEDIR = "original.data/Bukowski"
-    for i in range(2, 5):
-        name = "bukowski_%02d" % i
-        # get the base from the mpeg
-        p = glob.glob(os.path.join(WALTER_BASEDIR, name, "*.mpeg"))
-        basepath = p[0][:-5]
+    
+    for bn, start, stop in [('Cummings', 1, 10), ('bukowski', 1, 8), 
+                           ('Dickinson', 1, 4)]:
+        for i in range(start, stop + 1):
+            name = "%s_%02d" % (bn, i)
+            # get the base from the mpeg
+            p = glob.glob(os.path.join(WALTER_BASEDIR, name, "*.mpeg"))
+            basepath = p[0][:-5]
 
-        mpeg = basepath + ".mpeg"
-        postimestamp = basepath + ".postimestamp"
-        epochs = glob.glob(basepath + "_*.p")
-        awake_epochs = [e for e in epochs if 'sleep' not in e]
+            mpeg = basepath + ".mpeg"
+            postimestamp = basepath + ".postimestamp"
+            epochs = glob.glob(basepath + "_*.p")
+            awake_epochs = [e for e in epochs if 'sleep' not in e]
 
-        params = {'field_dim_m' : (1.5, 2.0),  
-                  'frame_dim_pix': (240, 320)}
+            params = {'field_dim_m' : (1.5, 2.0),  
+                      'frame_dim_pix': (240, 320)}
 
-        yield (mpeg, postimestamp, awake_epochs, name, params)
+            yield (mpeg, postimestamp, awake_epochs, name, params)
     
     #Jai's data
     JAI_BASEDIR = "original.data/jai"
