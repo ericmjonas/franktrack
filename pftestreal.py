@@ -23,18 +23,19 @@ from ruffus import *
 
 T_DELTA = 1/30.
 
-LIKELIHOOD_CONFIGS = [('le1', {'power' : 1, 'log' : False, 'normalize' : False}),
-                      ('le2', {'power' : 2, 'log' : False, 'normalize' : False}),
-                      ('le3', {'power' : 10, 'log' : False, 'normalize' : False}),
-                      ('le4', {'power' : 1, 'log' : False, 'normalize' : True}),
-                      ('le5', {'power' : 2, 'log' : False, 'normalize' : True}),
-                      ('le6', {'power' : 10, 'log' : False, 'normalize' : True}),
-                      ('le7', {'power' : 1, 'log' : True, 'normalize' : False}),
-                      ('le8', {'power' : 1, 'log' : True, 'normalize' : True}),
-                      ('le9', {'power' : 2, 'log' : True, 'normalize' : True}),
-                      ('le10', {'power' : 2, 'log' : True, 'normalize' : False}),
-                      ('le11', {'power' : 10, 'log' : True, 'normalize' : True}),
-                ]
+LIKELIHOOD_CONFIGS = [
+    # ('le1', {'power' : 1, 'log' : False, 'normalize' : False}),
+    # ('le2', {'power' : 2, 'log' : False, 'normalize' : False}),
+    # ('le3', {'power' : 10, 'log' : False, 'normalize' : False}),
+    # ('le4', {'power' : 1, 'log' : False, 'normalize' : True}),
+    # ('le5', {'power' : 2, 'log' : False, 'normalize' : True}),
+    # ('le6', {'power' : 10, 'log' : False, 'normalize' : True}),
+    # ('le7', {'power' : 1, 'log' : True, 'normalize' : False}),
+    ('le8', {'power' : 1, 'log' : True, 'normalize' : True}),
+    # ('le9', {'power' : 2, 'log' : True, 'normalize' : True}),
+    # ('le10', {'power' : 2, 'log' : True, 'normalize' : False}),
+    # ('le11', {'power' : 10, 'log' : True, 'normalize' : True}),
+    ]
 
 
 FL_DATA = "data/fl"
@@ -47,7 +48,8 @@ def enlarge_sep(eo_params, amount=1.0):
 
 def params():
     PARTICLEN = 1000
-    FRAMEN = 1000
+    #frame_start, frame_end work like python
+    FRAMES = [(0, 20), (80, 100)]
     EPOCHS = ['bukowski_04.W1', 
               'bukowski_04.W2', 
               'bukowski_03.W1', 
@@ -57,27 +59,28 @@ def params():
               'bukowski_03.linear', 
               'bukowski_04.linear'
               ]
-
+    posnoise = 0.01
+    velnoise = 0.05
+    
     for epoch in EPOCHS:
-        for posnoise in [0.01]:
-            for velnoise in [0.05]:
-                for pix_threshold in [0]:
-                    for likeli_name, likeli_params in LIKELIHOOD_CONFIGS:
+        for frame_start, frame_end in FRAMES:
+            for pix_threshold in [200]:
+                for likeli_name, likeli_params in LIKELIHOOD_CONFIGS:
+                    
+                    infile = [os.path.join(FL_DATA, epoch), 
+                              os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                              os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                              os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
+                              ]
 
-                        infile = [os.path.join(FL_DATA, epoch), 
-                                  os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                                  os.path.join(FL_DATA, epoch, 'region.pickle'), 
-                                  os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
-                                  ]
-
-                        outfile = 'particles.%s.%s.%f.%f.%d.%d.%d.npz' % (epoch, likeli_name, posnoise, 
-                                                                       velnoise, pix_threshold, 
-                                                                       PARTICLEN, FRAMEN)
-
-                        yield (infile, outfile, epoch, 
-                               (likeli_name,  likeli_params), 
-                               posnoise, velnoise, pix_threshold, 
-                               PARTICLEN, FRAMEN)
+                    outfile = 'particles.%s.%s.%f.%f.%d.%d.%d-%d.npz' % (epoch, likeli_name, posnoise, 
+                                                                         velnoise, pix_threshold, 
+                                                                         PARTICLEN, frame_start, frame_end)
+                    
+                    yield (infile, outfile, epoch, 
+                           (likeli_name,  likeli_params), 
+                           posnoise, velnoise, pix_threshold, 
+                           PARTICLEN, frame_start, frame_end)
            
 
 @files(params)
@@ -86,7 +89,7 @@ def pf_run((epoch_dir, epoch_config_filename,
            epoch, (likeli_name, likeli_params), 
            posnoise, 
            velnoise, pix_threshold, PARTICLEN, 
-           FRAMEN):
+           frame_start, frame_end):
     np.random.seed(0)
     
     cf = pickle.load(open(epoch_config_filename, 'r'))
@@ -101,16 +104,17 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr = TemplateObj()
     tr.set_params(*eoparams)
     
-    # le = likelihood.LikelihoodEvaluator2(env, tr, similarity=likeli_type, 
-    #                                      likeli_params = likeli_params)
+    le = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
+                                         sim_params = {'power' : 1.0})
 
-    le = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
+    #le = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
 
     model_inst = model.CustomModel(env, le, 
                                    POS_NOISE_STD=posnoise,
                                    VELOCITY_NOISE_STD=velnoise)
+    frame_pos = np.arange(frame_start, frame_end)
     # load frames
-    frames = organizedata.get_frames(epoch_dir, np.arange(FRAMEN))
+    frames = organizedata.get_frames(epoch_dir, frame_pos)
     for fi, f in enumerate(frames):
         frames[fi][frames[fi] < pix_threshold] = 0
         pix_ul = list(env.gc.real_to_image(region['x_pos_min'], 
@@ -133,7 +137,7 @@ def pf_run((epoch_dir, epoch_config_filename,
         
 
     y = frames
-    videotools.dump_grey_movie('test.avi', y)
+
     prop = proposals.HigherIsotropic()
     unnormed_weights, particles, ancestors = pf.arbitrary_prop(y, model_inst, 
                                                                prop, 
@@ -141,6 +145,7 @@ def pf_run((epoch_dir, epoch_config_filename,
     # unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
     #                                                      PARTICLEN)
     np.savez_compressed(outfile, 
+                        frame_pos = frame_pos, 
                         unnormed_weights=unnormed_weights, 
                         particles=particles, 
                         ancestors=ancestors)
@@ -161,9 +166,9 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     
     
     a = np.load(particles_file)
-    FRAMES = 100000000
-    weights = ssm.util.norm_weights(a['unnormed_weights'][:FRAMES])
-    particles = a['particles'][:FRAMES]
+    frame_pos = a['frame_pos']
+    weights = ssm.util.norm_weights(a['unnormed_weights'])
+    particles = a['particles']
     N = len(particles)
 
     led_params_filename = os.path.join(epoch_dir, "led.params.pickle")
@@ -211,7 +216,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         v_bar = np.average(vals[v], axis=1, weights=weights)
         vals_dict[v] = v_bar
         v_truth_interp = truth_interp_dict[v][:N]
-        x = np.arange(0, len(v_bar))
+        x = frame_pos
         cred = np.zeros((len(x), 2), dtype=np.float)
         for ci, (p, w) in enumerate(zip(vals[v], weights)):
             cred[ci] = util.credible_interval(p, w)
@@ -224,7 +229,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
         # plot truth
-        ax.plot(v_truth_interp, 
+        ax.plot(x, v_truth_interp, 
                 linewidth=1, c='k')
         
         ax.set_ylim(np.min(v_truth_interp)-0.1, 
@@ -251,7 +256,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         wcsi = np.searchsorted(wcs, 0.95)
         real_particle_num.append(wcsi)
 
-    pylab.plot(real_particle_num)
+    pylab.plot(frame_pos, real_particle_num)
 
     pylab.savefig(all_plot_filename, dpi=400)
 
@@ -261,7 +266,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     for vi, v in enumerate(['x', 'y']):
         v_bar = np.average(vals[v], axis=1, weights=weights)
         truth_interp = truth_interp_dict[v][:N]
-        x = np.arange(0, len(v_bar))
+        x = frame_pos
         cred = np.zeros((len(x), 2), dtype=np.float)
         for ci, (p, w) in enumerate(zip(vals[v], weights)):
             cred[ci] = util.credible_interval(p, w)
@@ -297,8 +302,9 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     # find index of errors in decreasing order
     error_i = np.argsort(deltas)[::-1]
     errs = error_i[:PLOT_ERRORS]
+    framepos_errs = frame_pos[errs]
     error_frames = organizedata.get_frames(epoch_dir, 
-                                           errs)
+                                           framepos_errs)
 
     f = pylab.figure()
     WINDOW_PIX = 30
@@ -352,7 +358,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         #ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.set_title(error_frame_i)
+        ax.set_title(framepos_errs[plot_error_i])
 
     pylab.savefig(examples_filename, dpi=300)
 
@@ -366,9 +372,9 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
             (vid_filename,), pix_threshold):
     
     a = np.load(particles_file)
-    FRAMES = 100000000
-    weights = ssm.util.norm_weights(a['unnormed_weights'][:FRAMES])
-    particles = a['particles'][:FRAMES]
+    frame_pos = a['frame_pos']
+    weights = ssm.util.norm_weights(a['unnormed_weights'])
+    particles = a['particles']
     N = len(particles)
 
     led_params_filename = os.path.join(epoch_dir, "led.params.pickle")
@@ -401,7 +407,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         vals_dict[v] = v_bar
 
     frames = organizedata.get_frames(epoch_dir, 
-                                     np.arange(N))
+                                     frame_pos)
     truth, missing = measure.interpolate(truth)
 
     derived_truth = measure.compute_derived(truth, 
@@ -489,7 +495,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
             ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.set_title(fi)
+            ax.set_title(frame_pos[fi])
         plot_filename = "%s.%08d.png" % (vid_filename, fi)
         f.savefig(plot_filename)
         plot_temp_filenames.append(plot_filename)
@@ -516,7 +522,8 @@ def results_summarize(infiles, summary_file):
                  'velnoise' : dp[3], 
                  'pix_threshold' : dp[4], 
                  'particlen' : dp[5], 
-                 'framen' : dp[6], 
+                 'frame_start' : dp[6], 
+                 'frame_end' : dp[7], 
                  'variable' : var_name, 
                  'pfmean' : var_data['pfmean'], 
                  'pfcred' : var_data['pfcred'], 
