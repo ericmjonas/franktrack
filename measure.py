@@ -501,13 +501,14 @@ def plot_diode_params(led_params_pickle, (params_png, examples_png)):
         for c in range(2, 8):
             for r in range(i*2, i*2 + 2):
                 ax = pylab.subplot2grid((4, 8), (r, c))
+                print subsampled_frames.shape
                 ax.imshow(subsampled_frames[fpos, i, :, :], 
                           interpolation='nearest', 
                           cmap=pylab.cm.gray, vmin=0, vmax=255)
                 ax.grid(1)
                 ax.set_xticks([])
                 ax.set_yticks([])
-                fpos += 1
+                fpos = min(fpos + 1, subsampled_frames.shape[0]-1)
 
 
     pylab.savefig(examples_png, dpi=300)
