@@ -1,4 +1,5 @@
 import numpy as np
+import glob
 import scipy.stats
 import pandas
 import cPickle as pickle
@@ -49,16 +50,14 @@ def enlarge_sep(eo_params, amount=1.0):
 def params():
     PARTICLEN = 1000
     #frame_start, frame_end work like python
-    FRAMES = [(0, 20), (80, 100)]
-    EPOCHS = ['bukowski_04.W1', 
-              'bukowski_04.W2', 
-              'bukowski_03.W1', 
-              'bukowski_03.W2', 
-              'bukowski_04.C', 
-              'bukowski_03.C', 
-              'bukowski_03.linear', 
-              'bukowski_04.linear'
-              ]
+    FRAMES = [(0, 50)]
+    # EPOCHS = ['bukowski_01.C', 
+    #           'bukowski_01.W1', 
+    #           'bukowski_01.linear', 
+    #           'bukowski_01.W2', 
+    #           ]
+
+    EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
     posnoise = 0.01
     velnoise = 0.05
     
