@@ -50,20 +50,20 @@ def enlarge_sep(eo_params, amount=1.0):
 def params():
     PARTICLEN = 1000
     #frame_start, frame_end work like python
-    FRAMES = [(1000, 1050)]
-    EPOCHS = ['bukowski_05.W1', 
-              'bukowski_02.W1', 
-              'bukowski_01.linear', 
-              'bukowski_05.linear', 
-              ]
+    FRAMES = [(800, 850)]
+    # EPOCHS = ['bukowski_05.W1', 
+    #           'bukowski_02.W1', 
+    #           'bukowski_01.linear', 
+    #           'bukowski_05.linear', 
+    #           ]
 
-    #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
     posnoise = 0.01
     velnoise = 0.05
     
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
-            for pix_threshold in [0]:
+            for pix_threshold in [0, 200, 240]:
                 for likeli_name, likeli_params in LIKELIHOOD_CONFIGS:
                     
                     infile = [os.path.join(FL_DATA, epoch), 
@@ -275,13 +275,13 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         ax.fill_between(x, cred[:, 0],
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
-        ax.plot(truth_interp, 
+        ax.plot(x, truth_interp, 
                 linewidth=1,  c='k')
         for i in np.argwhere(np.isnan(truth[v][frame_pos])):
             ax.axvline(i, c='r', linewidth=0.1, alpha=0.5)
 
         ax.grid(1)
-        ax.set_xlim((0, N))
+        ax.set_xlim((np.min(x), np.max(x)))
         ax.set_ylim((np.min(truth_interp), 
                      np.max(truth_interp)))
         ax.set_xlabel("time (frames)")
@@ -419,12 +419,13 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     ax_particles = pylab.subplot(1, 2, 2)
     plot_temp_filenames = []
     for fi in range(N):
+        abs_frame = frame_pos[fi] # absolute frame position
         ax_est.clear()
         ax_particles.clear()
 
-        true_x = truth['x'][fi]
-        true_y = truth['y'][fi]
-        true_phi = derived_truth['phi'][fi]
+        true_x = truth['x'][abs_frame]
+        true_y = truth['y'][abs_frame]
+        true_phi = derived_truth['phi'][abs_frame]
         true_x_pix, true_y_pix = env.gc.real_to_image(true_x, true_y)
 
         est_x  = vals_dict['x'][fi]
@@ -466,7 +467,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
         # LED points in ground truth
         for field_name, color in [('led_front', 'g'), ('led_back', 'r')]:
-            lpx, lpy = env.gc.real_to_image(*truth[field_name][fi])
+            lpx, lpy = env.gc.real_to_image(*truth[field_name][abs_frame])
             ax_est.scatter([lpx], [lpy], c=color)
 
         # now all particles
