@@ -80,6 +80,8 @@ class TemplateRenderGaussian(object):
         
         self.length = length
         self.front_size = front_size
+        if back_size < 1:
+            raise Exception("Too small of backsize")
         self.back_size = back_size
     
     def render(self, phi, theta):
@@ -134,6 +136,8 @@ class TemplateRenderCircleBorder(object):
         
         self.length = length
         self.front_size = front_size
+        if back_size < 1:
+            raise Exception("Too small of backsize")
         self.back_size = back_size
     
     def render(self, phi, theta):

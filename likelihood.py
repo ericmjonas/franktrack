@@ -254,14 +254,40 @@ class LikelihoodEvaluator3(object):
         front_pos_pix, back_pos_pix = util.compute_pos(self.template_obj.length, 
                                                        x_pix, y_pix, phi, theta)
         front_deltas = np.abs((coordinates - np.array(front_pos_pix)[:2][::-1]))
+        front_dists = np.sqrt(np.sum(front_deltas**2, axis=1))
+
+        
+        assert len(front_dists) == len(coordinates)
+
+
+
         back_deltas = np.abs((coordinates - np.array(back_pos_pix)[:2][::-1]))
+        back_dists = np.sqrt(np.sum(back_deltas**2, axis=1))
+
+
+        dist_thold = self.params.get('dist-thold', None)
+        if dist_thold != None:
+            front_deltas= front_deltas[front_deltas < dist_thold]
+            back_deltas = back_deltas[back_deltas < dist_thold]
+        
+        closest_n = self.params.get('closest-n', None)
+        if closest_n != None:
+            front_deltas = np.sort(front_deltas)[::-1]
+            back_deltas = np.sort(back_deltas)[::-1]
+            front_deltas= front_deltas[:closest_n]
+            back_deltas = back_deltas[:closest_n]
+            
         power = self.params.get('power', 1)
         
-        delta_sum = np.sum(front_deltas**power) + np.sum(back_deltas**power)
+        delta_sum = np.sum(front_dists**power) + np.sum(back_dists**power)
+
         if self.params.get('normalize', True):
             delta_sum = delta_sum / len(coordinates)
+
         if self.params.get('log', False):
             score = -np.log(delta_sum)
+        elif self.params.get('exp', False):
+            score = -np.exp(delta_sum)
         else:
             score = -delta_sum
 

@@ -19,6 +19,7 @@ import video
 from ssm import particlefilter as pf
 import ssm
 import proposals
+import skimage.feature
 
 from ruffus import * 
 
@@ -32,7 +33,21 @@ LIKELIHOOD_CONFIGS = [
     # ('le5', {'power' : 2, 'log' : False, 'normalize' : True}),
     # ('le6', {'power' : 10, 'log' : False, 'normalize' : True}),
     # ('le7', {'power' : 1, 'log' : True, 'normalize' : False}),
-    ('le8', {'power' : 1, 'log' : True, 'normalize' : True}),
+    # ('le1', {'power' : 1.0, 'log' : False,
+    #          'exp' : False, 'normalize' : True, 
+    #          'dist-thold' : 30}),
+    # ('le8', {'power' : 0.5, 'log' : True,
+    #          'exp' : False, 'normalize' : True, 
+    #          'dist-thold' : None, 
+    #          'closest-n' : 5}),
+    ('le9', {'power' : 2.0, 'log' : True,
+             'exp' : False, 'normalize' : True, 
+             'dist-thold' : None, 
+             'closest-n' : 50}),
+    # ('le10', {'power' : 0.5, 'log' : False, 
+    #          'exp' : True, 'normalize' : True, 
+    #          'dist-thold' : None, 
+    #          'closest-n' : 5}),
     # ('le9', {'power' : 2, 'log' : True, 'normalize' : True}),
     # ('le10', {'power' : 2, 'log' : True, 'normalize' : False}),
     # ('le11', {'power' : 10, 'log' : True, 'normalize' : True}),
@@ -43,27 +58,37 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.0):
-    b = eo_params[0]*amount, eo_params[1], eo_params[2]
+def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=2.0):
+    
+    b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
 
+HARD_DATA = ['Dickinson_01.w1', 
+             'Cummings_05.linear', 
+             'Cummings_08.linear', 
+             'Cummings_06.c', 
+             'Cummings_08.linear', 
+             'Dickinson_04.c', 
+             'Cummings_06.w1']
+
 def params():
-    PARTICLEN = 1000
+    PARTICLEN = 100
     #frame_start, frame_end work like python
-    FRAMES = [(800, 850)]
+    FRAMES = [(700, 750)]
     # EPOCHS = ['bukowski_05.W1', 
     #           'bukowski_02.W1', 
     #           'bukowski_01.linear', 
     #           'bukowski_05.linear', 
     #           ]
 
-    EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    EPOCHS= HARD_DATA
     posnoise = 0.01
     velnoise = 0.05
     
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
-            for pix_threshold in [0, 200, 240]:
+            for pix_threshold in [0]:
                 for likeli_name, likeli_params in LIKELIHOOD_CONFIGS:
                     
                     infile = [os.path.join(FL_DATA, epoch), 
@@ -81,7 +106,17 @@ def params():
                            posnoise, velnoise, pix_threshold, 
                            PARTICLEN, frame_start, frame_end)
            
+class CombinedLE(object):
+    def __init__(self, LEs, weights):
+        self.LEs = LEs
+        self.weights = weights
 
+    def score_state(self, state, img):
+        score = 0.0
+        for le, weight in zip(self.LEs, self.weights):
+            score += weight * le.score_state(state, img)
+        return score
+        
 @files(params)
 def pf_run((epoch_dir, epoch_config_filename, 
             region_filename, led_params_filename), outfile, 
@@ -103,12 +138,14 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr = TemplateObj()
     tr.set_params(*eoparams)
     
-    le = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
+    le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
                                          sim_params = {'power' : 1.0})
 
-    #le = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
+    le2 = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
+    
+    cle = CombinedLE([le1, le2], [1.0, 1.0])
 
-    model_inst = model.CustomModel(env, le, 
+    model_inst = model.CustomModel(env, cle, 
                                    POS_NOISE_STD=posnoise,
                                    VELOCITY_NOISE_STD=velnoise)
     frame_pos = np.arange(frame_start, frame_end)
@@ -415,13 +452,17 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
     WINDOW_PIX = 40
     f = pylab.figure()
-    ax_est = pylab.subplot(1,2, 1)
-    ax_particles = pylab.subplot(1, 2, 2)
+    ax_est = pylab.subplot(2,2, 1)
+    ax_particles = pylab.subplot(2, 2, 2)
+    ax_rawvid = pylab.subplot(2, 2, 3)
+    ax_filt = pylab.subplot(2, 2, 4)
     plot_temp_filenames = []
     for fi in range(N):
         abs_frame = frame_pos[fi] # absolute frame position
         ax_est.clear()
         ax_particles.clear()
+        ax_rawvid.clear()
+        ax_filt.clear()
 
         true_x = truth['x'][abs_frame]
         true_y = truth['y'][abs_frame]
@@ -442,21 +483,39 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                                                est_phi, est_theta)
 
 
-        cir = pylab.Circle(front_pos, radius=eoparams[1],  
-                           ec='g', fill=False,
-                           linewidth=2)
+
 
         ax_est.imshow(frames[fi], 
                   interpolation='nearest', cmap=pylab.cm.gray)
+
+
+        ax_rawvid.imshow(frames[fi].copy(), 
+                         interpolation='nearest', cmap=pylab.cm.gray)
+
+
+        # filtered image
+        coordinates = skimage.feature.peak_local_max(frames[fi], 
+                                                     min_distance=20, 
+                                                     threshold_abs=200)
+        ax_filt.imshow(frames[fi].copy(), 
+                         interpolation='nearest', cmap=pylab.cm.gray)
+
+        ax_filt.plot([p[1] for p in coordinates], [p[0] for p in coordinates], 'r.')
+
         frames[fi][frames[fi] < pix_threshold] = 0
         ax_particles.imshow(frames[fi], 
                             interpolation='nearest', cmap=pylab.cm.gray)
 
+        # plot the circles
+        cir = pylab.Circle(front_pos[:2], radius=eoparams[1],  
+                           ec='g', fill=False,
+                           linewidth=2)
+        print 'front_pos=', front_pos, 'back_pos=', back_pos, eoparams
         ax_est.add_patch(cir)
-        cir = pylab.Circle(back_pos, radius=eoparams[2],  
+        cir_back = pylab.Circle(back_pos[:2], radius=eoparams[2],  
                            ec='r', fill=False, 
                            linewidth=2)
-        ax_est.add_patch(cir)
+        ax_est.add_patch(cir_back)
 
         # true
         ax_est.axhline(true_y_pix, c='b')
@@ -465,6 +524,13 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         ax_est.axhline(est_y_pix, c='y')
         ax_est.axvline(est_x_pix, c='y')
 
+        # true
+        ax_rawvid.axhline(true_y_pix, c='b')
+        ax_rawvid.axvline(true_x_pix, c='b')
+        # extimated
+        ax_rawvid.axhline(est_y_pix, c='y')
+        ax_rawvid.axvline(est_x_pix, c='y')
+        
         # LED points in ground truth
         for field_name, color in [('led_front', 'g'), ('led_back', 'r')]:
             lpx, lpy = env.gc.real_to_image(*truth[field_name][abs_frame])
@@ -497,8 +563,14 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
             ax.set_xticks([])
             ax.set_yticks([])
             ax.set_title(frame_pos[fi])
+
+        ax_rawvid.set_xticks([])
+        ax_rawvid.set_yticks([])
+        ax_filt.set_xticks([])
+        ax_filt.set_yticks([])
+
         plot_filename = "%s.%08d.png" % (vid_filename, fi)
-        f.savefig(plot_filename)
+        f.savefig(plot_filename, dpi=100)
         plot_temp_filenames.append(plot_filename)
 
     video.frames_to_mpng("%s.*.png" % vid_filename, vid_filename)

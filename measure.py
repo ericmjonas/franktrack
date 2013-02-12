@@ -430,6 +430,7 @@ def led_params_to_EO(cf, led_params):
     
     ledimgs_mean = led_params['ledimgs_mean']
 
+
     S = ledimgs_mean[0].shape[0]
 
     # in both cases taking the horizontal one
@@ -441,10 +442,10 @@ def led_params_to_EO(cf, led_params):
 
     w_front = (sigma_front_h + sigma_front_v)/2.
     w_back = (sigma_back_h + sigma_back_v)/2.
-    
+
     dist_in_m = np.mean(led_params['dist'])
     dist_in_pix = int(dist_in_m * env.gc.pix_per_meter[0])
-    return (dist_in_pix, int(w_front), int(w_back))
+    return (dist_in_pix, np.ceil(w_front), np.ceil(w_back))
 
 @follows(measure_diode_params)    
 @transform(os.path.join(DATA_DIR, "*/led.params.pickle"), 
