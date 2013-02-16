@@ -35,10 +35,10 @@ def params():
               'bukowski_01.C', 
               'bukowski_05.linear', 
               ]
-    EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
-
+    #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    
     np.random.seed(0)
-    FRAMES = [(0, 868)]
+    FRAMES = [(0, 100)]
 
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
@@ -130,23 +130,24 @@ def det_plot((epoch_dir, epoch_config_filename, results),
                                             T_DELTA)
 
     f1 = pylab.figure(figsize=(32, 8))
-    ROWN = 5
+    ROWN = 7
     FRAME_SUBSAMPLE = int(FRAMEN / 30)
     ax_frames = f1.add_subplot(ROWN, 1, 1)
     ax_truth = f1.add_subplot(ROWN, 1, 2)
     ax_coord_cnt = f1.add_subplot(ROWN, 1, 3)
     ax_coord_mean = f1.add_subplot(ROWN, 1, 4)
     ax_coord_filt_mean = f1.add_subplot(ROWN, 1, 5)
+    ax_phi = f1.add_subplot(ROWN, 1, 6)
 
     a = np.hstack(frames[::FRAME_SUBSAMPLE])
     ax_frames.imshow(a, interpolation = 'nearest', 
                      vmin=0, vmax=255, cmap=pylab.cm.gray)
     clear_ticks(ax_frames)
-    print len(frame_pos), len(truth_interp['x'])
     ax_truth.plot(frame_pos, truth_interp[frame_pos]['x'], label='x')
     ax_truth.plot(frame_pos, truth_interp[frame_pos]['y'], label='y')
-    
 
+
+    ax_phi.plot(frame_pos, derived_truth['phi'][frame_pos])
     coordinates = data['coordinates']
     regions = data['regions']
     filtered_coordinates = []
@@ -157,9 +158,7 @@ def det_plot((epoch_dir, epoch_config_filename, results),
                                                   max_height=40)
         fc = filters.points_in_mask(filtered_regions > 0, 
                                                            coordinates[fi])
-        if len(fc) > 0: print fc.shape, coordinates[fi][0], fc[0] 
         filtered_coordinates.append(fc)
-        print "fc=", fc
 
     ### how many coordinate points
     ax_coord_cnt.plot(frame_pos, [len(x) for x in filtered_coordinates])
@@ -174,13 +173,22 @@ def det_plot((epoch_dir, epoch_config_filename, results),
                 coord_means[i] = env.gc.image_to_real(*np.mean(np.fliplr(coord[i]), 
                                                                axis=0))
 
-        print coord_means.shape, coord_means
         ax.plot(frame_pos, truth_interp[frame_pos]['x'], c='b')
         ax.plot(frame_pos, truth_interp[frame_pos]['y'], c='r')
         ax.scatter(frame_pos, coord_means[:, 0], c='b', linewidth=0, s=4)
         ax.scatter(frame_pos, coord_means[:, 1], c='r', linewidth=0, s=4)
         ax.set_xlim(np.min(frame_pos), np.max(frame_pos))
 
+    thetas_est = np.zeros(FRAMEN)
+    for i in range(FRAMEN):
+        c = filtered_coordinates[i]
+        if len(c) > 1:
+            fc = np.fliplr(c)
+            U, s, V = np.linalg.svd(fc)
+
+            theta = np.arctan2(V[1,0], V[0, 0])
+            thetas_est[i] = theta
+    ax_phi.scatter(frame_pos, thetas_est)
 
     pylab.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     pylab.savefig(all_plot_filename, dpi=300)

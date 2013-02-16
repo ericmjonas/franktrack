@@ -47,7 +47,6 @@ def filter_regions(labeled_regions, size_thold = 300, max_width=30, max_height=3
     return regions
 
 def points_in_mask(mask, coords):
-    print coords.dtype, coords.shape
     coords_ints = np.round(coords).astype(int)
     out_coords = []
     for coord in coords_ints:
