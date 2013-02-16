@@ -150,7 +150,8 @@ class LikelihoodEvaluator2(object):
         self.similarity = similarity
         print "sim_params=", sim_params
         if sim_params == None:
-            self.sim_params = {'power' : 2}
+            self.sim_params = {'power' : 2, 
+                               'pix-threshold' : 0}
         else:
             self.sim_params = sim_params
 
@@ -164,12 +165,16 @@ class LikelihoodEvaluator2(object):
 
         theta = state['theta']
         phi = state['phi']
+
+        img_thold = img.copy()
+        img_thold[img_thold < self.sim_params['pix-threshold']] = 0
+
         x_pix, y_pix = self.env.gc.real_to_image(x, y)
         x_pix = int(x_pix)
         y_pix = int(y_pix)
         template_img = self.template_obj.render(phi, theta)
         template_pix = template_img*255
-        img_region, template_region = template.template_select(img, template_pix, 
+        img_region, template_region = template.template_select(img_thold, template_pix, 
                                                                x_pix - template_pix.shape[1]/2, 
                                                                y_pix - template_pix.shape[0]/2)
         tr_size = template_region.count()
@@ -223,7 +228,8 @@ class LikelihoodEvaluator3(object):
         if params == None:
             self.params = {'log' : False, 
                            'power' : 1, 
-                           'normalize' : False}
+                           'normalize' : False, 
+                           'pix-threshold' : 0}
         else:
             self.params = params
 
@@ -236,11 +242,14 @@ class LikelihoodEvaluator3(object):
         y = state['y']
         theta = state['theta']
         phi = state['phi']
+        img_thold = img.copy()
+        img_thold[img_thold < self.params['pix-threshold']] = 0 
 
-        if self.img_cache == None or (self.img_cache != img).any():
-            self.img_cache = img.copy()
-            self.coordinates = skimage.feature.peak_local_max(img, min_distance=10, 
-                                                              threshold_abs=200)
+        if self.img_cache == None or (self.img_cache != img_thold).any():
+            self.img_cache = img_thold.copy()
+            self.coordinates = skimage.feature.peak_local_max(img_thold, 
+                                                              min_distance=50, 
+                                                              threshold_rel=0.8)
             
         
         # get the points 
@@ -284,14 +293,80 @@ class LikelihoodEvaluator3(object):
         if self.params.get('normalize', True):
             delta_sum = delta_sum / len(coordinates)
 
-        if self.params.get('log', False):
+        if len(coordinates) == 0:
+            score = -1e10
+
+        elif self.params.get('log', False):
             score = -np.log(delta_sum)
         elif self.params.get('exp', False):
             score = -np.exp(delta_sum)
         else:
             score = -delta_sum
-
+            
+        print score, len(coordinates), delta_sum
         return score
+
+class LikelihoodEvaluator4(object):
+    """
+    THis one uses the number of points; that means that it's going to probably
+    be non-smooth
+    """
+    def __init__(self, env, template_obj, params=None):
+
+        self.env = env
+        self.template_obj = template_obj
+        self.img_cache = None
+        if params == None:
+            self.params = {'log' : False, 
+                           'power' : 1, 
+                           'normalize' : False, 
+                           'pix-threshold' : 0}
+        else:
+            self.params = params
+
+    def score_state(self, state, img):
+        return self.score_state_full(state, img)
+
+    def score_state_full(self, state, img):
+        assert len(img.shape)== 2
+        x = state['x']
+        y = state['y']
+        theta = state['theta']
+        phi = state['phi']
+        img_thold = img.copy()
+        img_thold[img_thold < self.params['pix-threshold']] = 0 
+
+        if self.img_cache == None or (self.img_cache != img_thold).any():
+            self.img_cache = img_thold.copy()
+            self.coordinates = skimage.feature.peak_local_max(img_thold, 
+                                                              min_distance=10, 
+                                                              threshold_abs=220)
+            # coordinates = self.coordinates
+            # pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
+            # pylab.plot([p[1] for p in coordinates], [p[0] for p in coordinates], 'r.')
+            # pylab.show()            
+        
+        # get the points 
+        coordinates = self.coordinates
+        
+
+        x_pix, y_pix = self.env.gc.real_to_image(x, y)
+        x_pix = int(x_pix)
+        y_pix = int(y_pix)
+        
+        front_pos_pix, back_pos_pix = util.compute_pos(self.template_obj.length, 
+                                                       x_pix, y_pix, phi, theta)
+        ppc = template.PointCloudCount(front_pos_pix[:2], 
+                                       self.template_obj.front_size, 
+                                       back_pos_pix[:2], 
+                                       self.template_obj.back_size)
+        fpi, bpi, bi = ppc.get_points(np.fliplr(coordinates))
+        
+        count = len(fpi) + len(bpi) - len(bi)
+        # if count != 0:
+        #     print x_pix, y_pix, "Points:", len(fpi), len(bpi), len(bi)
+        return np.exp(count)
+
 
 if __name__ == "__main__":
     eo = EvaluateObj(320, 240)

@@ -174,3 +174,51 @@ class TemplateRenderCircleBorder(object):
 
         
         
+class PointCloudCount(object):
+    """
+    A better model, which takes in a point cloud and then counts:
+    1. number of points < R_front
+    2. number of points < R_back
+    3. number of points not in either set that are within the right dist
+
+    """
+    def __init__(self, front_xy, front_r, 
+                     back_xy, back_r):
+        self.front_xy = front_xy
+        self.front_r = front_r
+        self.back_xy = back_xy
+        self.back_r = back_r
+
+
+    def get_points(self, pointcloud):
+        """
+        returns front_point_index, back_point_index, between_index
+        """
+        
+        center = np.mean([self.front_xy, self.back_xy], axis=0)
+
+        def dist(xy1, xy2):
+            return np.sqrt(np.sum((xy1 - xy2)**2.))
+
+        r = dist(center, self.front_xy)
+        front_point_index = []
+        back_point_index = []
+        between_index = []
+
+        for pi, p in enumerate(pointcloud):
+            # FIXME : first check if too far away, will require only
+            # a single comparison
+            if dist(self.front_xy, p) < self.front_r:
+                front_point_index.append(pi)
+            elif dist(self.back_xy, p) < self.back_r:
+                back_point_index.append(pi)
+            elif dist(center, p) < r:
+                between_index.append(pi)
+
+        return (np.array(front_point_index), 
+                np.array(back_point_index), 
+                np.array(between_index))
+                
+        
+    
+    

@@ -108,4 +108,32 @@ def test_template_render():
     pylab.subplot(1, 2, 2)
     pylab.imshow(i1.mask.astype(float), interpolation='nearest')
     pylab.colorbar()
+    #pylab.show()
+
+def test_point_cloud_count():
+    front_xy = (20.0, 40.)
+    front_r = 5.
+    back_xy = (40., 47.)
+    back_r = 7.
+    
+    
+    pcc = template.PointCloudCount(front_xy, front_r, 
+                                 back_xy, back_r)
+    
+    points = []
+    for x in range(200):
+        for y in range(200):
+            points.append((float(x)/2., float(y)/2.))
+
+    points = np.array(points)
+    
+    fpi, bpi, bi = pcc.get_points(points)
+
+    pylab.figure()
+    pylab.scatter(points[fpi][:, 0], 
+                   points[fpi][:, 1], c='g', linewidth=0)
+    pylab.scatter(points[bpi][:, 0], 
+                   points[bpi][:, 1], c='r', linewidth=0)
+    pylab.scatter(points[bi][:, 0], 
+                   points[bi][:, 1], c='b', linewidth=0)
     pylab.show()

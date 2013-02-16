@@ -43,7 +43,8 @@ LIKELIHOOD_CONFIGS = [
     ('le9', {'power' : 2.0, 'log' : True,
              'exp' : False, 'normalize' : True, 
              'dist-thold' : None, 
-             'closest-n' : 50}),
+             'closest-n' : 50, 
+             'pix-threshold' : 0}),
     # ('le10', {'power' : 0.5, 'log' : False, 
     #          'exp' : True, 'normalize' : True, 
     #          'dist-thold' : None, 
@@ -58,7 +59,7 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=2.0):
+def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
     
     b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
@@ -68,27 +69,38 @@ HARD_DATA = ['Dickinson_01.w1',
              'Cummings_08.linear', 
              'Cummings_06.c', 
              'Cummings_08.linear', 
+             'Bukowski_02.W2', 
              'Dickinson_04.c', 
              'Cummings_06.w1']
+
+DECENT_DATA = ['Bukowski_03.W2', 
+               'Bukowski_03.W1']
 
 def params():
     PARTICLEN = 100
     #frame_start, frame_end work like python
-    FRAMES = [(700, 750)]
-    # EPOCHS = ['bukowski_05.W1', 
-    #           'bukowski_02.W1', 
-    #           'bukowski_01.linear', 
-    #           'bukowski_05.linear', 
-    #           ]
-
+    FRAMES = [(0, 100)]
+    EPOCHS = [#'bukowski_05.W1', 
+        'bukowski_02.W1', 
+        #'bukowski_02.W2', 
+        #'bukowski_04.W1', 
+        #      'bukowski_04.W2',
+              #'bukowski_01.linear', 
+              #'bukowski_01.W1', 
+              #'bukowski_01.W2', 
+              #'bukowski_05.linear', 
+              ]
+    np.random.seed(0)
+    
     #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
-    EPOCHS= HARD_DATA
+    #EPOCHS = np.random.permutation(EPOCHS)
+    #EPOCHS= EPOCHS[:28] # should take ~5 min
     posnoise = 0.01
     velnoise = 0.05
     
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
-            for pix_threshold in [0]:
+            for pix_threshold in [240]:
                 for likeli_name, likeli_params in LIKELIHOOD_CONFIGS:
                     
                     infile = [os.path.join(FL_DATA, epoch), 
@@ -138,12 +150,13 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr = TemplateObj()
     tr.set_params(*eoparams)
     
-    le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
-                                         sim_params = {'power' : 1.0})
+    # cle = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
+    #                                       sim_params = {'power' : 1.0, 
+    #                                                     'pix-threshold' : pix_threshold})
 
-    le2 = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
+    cle = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
     
-    cle = CombinedLE([le1, le2], [1.0, 1.0])
+    #cle = CombinedLE([le2], [1.0])
 
     model_inst = model.CustomModel(env, cle, 
                                    POS_NOISE_STD=posnoise,
@@ -152,7 +165,6 @@ def pf_run((epoch_dir, epoch_config_filename,
     # load frames
     frames = organizedata.get_frames(epoch_dir, frame_pos)
     for fi, f in enumerate(frames):
-        frames[fi][frames[fi] < pix_threshold] = 0
         pix_ul = list(env.gc.real_to_image(region['x_pos_min'], 
                                            region['y_pos_min']))
         if pix_ul[1] <0 :
@@ -452,10 +464,11 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
     WINDOW_PIX = 40
     f = pylab.figure()
-    ax_est = pylab.subplot(2,2, 1)
-    ax_particles = pylab.subplot(2, 2, 2)
-    ax_rawvid = pylab.subplot(2, 2, 3)
-    ax_filt = pylab.subplot(2, 2, 4)
+    ax_est = pylab.subplot(2,3, 1)
+    ax_particles = pylab.subplot(2, 3, 2)
+    ax_particles_global = pylab.subplot(2, 3, 3)
+    ax_rawvid = pylab.subplot(2, 3, 4)
+    ax_filt = pylab.subplot(2, 3, 5)
     plot_temp_filenames = []
     for fi in range(N):
         abs_frame = frame_pos[fi] # absolute frame position
@@ -463,6 +476,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         ax_particles.clear()
         ax_rawvid.clear()
         ax_filt.clear()
+        ax_particles_global.clear()
 
         true_x = truth['x'][abs_frame]
         true_y = truth['y'][abs_frame]
@@ -495,8 +509,8 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
         # filtered image
         coordinates = skimage.feature.peak_local_max(frames[fi], 
-                                                     min_distance=20, 
-                                                     threshold_abs=200)
+                                                     min_distance=50, 
+                                                     threshold_rel=0.8)
         ax_filt.imshow(frames[fi].copy(), 
                          interpolation='nearest', cmap=pylab.cm.gray)
 
@@ -506,6 +520,8 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         ax_particles.imshow(frames[fi], 
                             interpolation='nearest', cmap=pylab.cm.gray)
 
+        ax_particles_global.imshow(frames[fi].copy(), 
+                                   interpolation='nearest', cmap=pylab.cm.gray)
         # plot the circles
         cir = pylab.Circle(front_pos[:2], radius=eoparams[1],  
                            ec='g', fill=False,
@@ -557,6 +573,15 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                              linewidth=0, 
                              alpha = 1.0, c='r', s=1)
 
+        ax_particles_global.scatter(particle_pix_pts[:, 0, 0], 
+                             particle_pix_pts[:, 0, 1], 
+                             linewidth=0, 
+                             alpha = 1.0, c='g', s=2)
+        ax_particles_global.scatter(particle_pix_pts[:, 1, 0], 
+                             particle_pix_pts[:, 1, 1], 
+                             linewidth=0, 
+                             alpha = 1.0, c='r', s=2)
+
         for ax in [ax_est, ax_particles]:
             ax.set_xlim((true_x_pix - WINDOW_PIX, true_x_pix + WINDOW_PIX))
             ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
@@ -569,8 +594,11 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         ax_filt.set_xticks([])
         ax_filt.set_yticks([])
 
+        ax_particles_global.set_xticks([])
+        ax_particles_global.set_yticks([])
+
         plot_filename = "%s.%08d.png" % (vid_filename, fi)
-        f.savefig(plot_filename, dpi=100)
+        f.savefig(plot_filename, dpi=200)
         plot_temp_filenames.append(plot_filename)
 
     video.frames_to_mpng("%s.*.png" % vid_filename, vid_filename)
