@@ -53,3 +53,38 @@ def points_in_mask(mask, coords):
         if mask[coord[0], coord[1]] > 0:
             out_coords.append(coord)
     return np.array(out_coords)
+
+def peak_region_filter(img, region_threshold):
+
+    coordinates = skimage.feature.peak_local_max(img, 
+                                                 min_distance=30, 
+                                                 threshold_rel=0.8)
+    img_thold = img > region_threshold
+    #pylab.subplot(2, 2, 1)
+    #pylab.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+    #pylab.subplot(2, 2, 2)
+    #pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
+
+    #pylab.subplot(2, 2, 3)
+    #pylab.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+    #pylab.plot([p[1] for p in coordinates], [p[0] for p in coordinates], 'r.')
+    #pylab.subplot(2, 2, 4)
+    #pylab.imshow(frame_regions)
+    
+    #pylab.plot([p[1] for p in fc], [p[0] for p in fc], 'r.')
+
+    #pylab.show()
+
+
+    frame_regions = label_regions(img)
+    
+    filtered_regions = filter_regions(frame_regions, 
+                                      size_thold = 300, 
+                                      max_width = 30,
+                                      max_height=30)
+    fc = points_in_mask(filtered_regions > 0, 
+                        coordinates)
+
+    
+    return fc
+    

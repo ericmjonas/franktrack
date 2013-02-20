@@ -19,6 +19,7 @@ import video
 from ssm import particlefilter as pf
 import ssm
 import proposals
+import filters
 import skimage.feature
 
 from ruffus import * 
@@ -77,18 +78,20 @@ DECENT_DATA = ['Bukowski_03.W2',
                'Bukowski_03.W1']
 
 def params():
-    PARTICLEN = 100
+    PARTICLEN = 1000
     #frame_start, frame_end work like python
-    FRAMES = [(0, 100)]
-    EPOCHS = [#'bukowski_05.W1', 
-        'bukowski_02.W1', 
-        #'bukowski_02.W2', 
-        #'bukowski_04.W1', 
-        #      'bukowski_04.W2',
-              #'bukowski_01.linear', 
-              #'bukowski_01.W1', 
-              #'bukowski_01.W2', 
-              #'bukowski_05.linear', 
+    FRAMES = [(0, 200)]
+    EPOCHS = [
+        # 'bukowski_05.W1', 
+        #       'bukowski_02.W1', 
+        #       'bukowski_02.W2', 
+        #       'bukowski_04.W1', 
+        #       'bukowski_04.W2',
+              'bukowski_01.linear', 
+              'Cummings_03.linear', 
+              # 'bukowski_01.W1', 
+              # 'bukowski_01.W2', 
+              # 'bukowski_05.linear', 
               ]
     np.random.seed(0)
     
@@ -150,12 +153,12 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr = TemplateObj()
     tr.set_params(*eoparams)
     
-    # cle = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
-    #                                       sim_params = {'power' : 1.0, 
-    #                                                     'pix-threshold' : pix_threshold})
-
-    cle = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
+    cle = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
+                                          sim_params = {'power' : 1.0, 
+                                                        'pix-threshold' : pix_threshold})
     
+    #cle = likelihood.LikelihoodEvaluator3(env, tr, params=likeli_params)
+
     #cle = CombinedLE([le2], [1.0])
 
     model_inst = model.CustomModel(env, cle, 
@@ -186,7 +189,12 @@ def pf_run((epoch_dir, epoch_config_filename,
 
     y = frames
 
-    prop = proposals.HigherIsotropic()
+    prop1 = proposals.HigherIsotropicAndData(env, lambda x: filters.peak_region_filter(x, pix_threshold))
+    prop2 = proposals.HigherIsotropic()
+
+    prop = ssm.proposal.MixtureProposalKernel([prop1, prop2], [0.8, 0.2])
+
+
     unnormed_weights, particles, ancestors = pf.arbitrary_prop(y, model_inst, 
                                                                prop, 
                                                                PARTICLEN)
@@ -526,7 +534,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         cir = pylab.Circle(front_pos[:2], radius=eoparams[1],  
                            ec='g', fill=False,
                            linewidth=2)
-        print 'front_pos=', front_pos, 'back_pos=', back_pos, eoparams
+
         ax_est.add_patch(cir)
         cir_back = pylab.Circle(back_pos[:2], radius=eoparams[2],  
                            ec='r', fill=False, 

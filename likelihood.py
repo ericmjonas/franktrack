@@ -11,6 +11,7 @@ import skimage.feature
 from matplotlib import pylab
 import util2 as util
 import template
+import filters
 
 def pos_to_int(p):
     return np.rint(p).astype(int)
@@ -148,7 +149,7 @@ class LikelihoodEvaluator2(object):
         self.env = env
         self.template_obj = template_obj
         self.similarity = similarity
-        print "sim_params=", sim_params
+
         if sim_params == None:
             self.sim_params = {'power' : 2, 
                                'pix-threshold' : 0}
@@ -247,15 +248,29 @@ class LikelihoodEvaluator3(object):
 
         if self.img_cache == None or (self.img_cache != img_thold).any():
             self.img_cache = img_thold.copy()
-            self.coordinates = skimage.feature.peak_local_max(img_thold, 
-                                                              min_distance=50, 
-                                                              threshold_rel=0.8)
-            
+            coordinates = skimage.feature.peak_local_max(img, 
+                                                         min_distance=30, 
+                                                         threshold_rel=0.8)
+            frame_regions = filters.label_regions(img_thold)
+
+            filtered_regions = filters.filter_regions(frame_regions, 
+                                                      size_thold = 300, 
+                                                      max_width = 30,
+                                                      max_height=30)
+            fc = filters.points_in_mask(filtered_regions > 0, 
+                                        coordinates)
+            self.coordinates = fc
+            # pylab.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
+            # pylab.plot([p[1] for p in self.coordinates], 
+            #            [p[0] for p in self.coordinates], 'r.')
+            # pylab.show()
+
         
         # get the points 
         coordinates = self.coordinates
         
-
+        if len(coordinates) == 0:
+            return 0
         x_pix, y_pix = self.env.gc.real_to_image(x, y)
         x_pix = int(x_pix)
         y_pix = int(y_pix)
@@ -303,7 +318,6 @@ class LikelihoodEvaluator3(object):
         else:
             score = -delta_sum
             
-        print score, len(coordinates), delta_sum
         return score
 
 class LikelihoodEvaluator4(object):

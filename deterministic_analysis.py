@@ -34,11 +34,13 @@ def params():
               'bukowski_01.W1', 
               'bukowski_01.C', 
               'bukowski_05.linear', 
+              'Cummings_03.w2', 
+              'Cummings_03.linear', 
               ]
     #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
     
     np.random.seed(0)
-    FRAMES = [(0, 100)]
+    FRAMES = [(0, 200)]
 
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
@@ -89,8 +91,8 @@ def det_run((epoch_dir, epoch_config_filename,
             tholds[thold][fi] = np.sum(frame > thold)
 
         coordinates.append(skimage.feature.peak_local_max(frame, 
-                                                          min_distance=30, 
-                                                          threshold_rel=0.8))
+                                                          min_distance=10, 
+                                                          threshold_abs=220))
 
         frame_regions = filters.label_regions(frame)
         regions[fi] = frame_regions
@@ -137,7 +139,7 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     ax_coord_cnt = f1.add_subplot(ROWN, 1, 3)
     ax_coord_mean = f1.add_subplot(ROWN, 1, 4)
     ax_coord_filt_mean = f1.add_subplot(ROWN, 1, 5)
-    ax_phi = f1.add_subplot(ROWN, 1, 6)
+    ax_points = f1.add_subplot(ROWN, 1, 6)
 
     a = np.hstack(frames[::FRAME_SUBSAMPLE])
     ax_frames.imshow(a, interpolation = 'nearest', 
@@ -147,19 +149,20 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     ax_truth.plot(frame_pos, truth_interp[frame_pos]['y'], label='y')
 
 
-    ax_phi.plot(frame_pos, derived_truth['phi'][frame_pos])
+
     coordinates = data['coordinates']
     regions = data['regions']
+    filtered_regions = np.zeros_like(data['regions'])
     filtered_coordinates = []
     for fi, f in enumerate(frame_pos):
-        filtered_regions = filters.filter_regions(regions[fi], 
+        filtered_regions[fi] = filters.filter_regions(regions[fi], 
                                                   size_thold = 3000, 
                                                   max_width = 40,
                                                   max_height=40)
-        fc = filters.points_in_mask(filtered_regions > 0, 
+        fc = filters.points_in_mask(filtered_regions[fi] > 0, 
                                                            coordinates[fi])
         filtered_coordinates.append(fc)
-
+        
     ### how many coordinate points
     ax_coord_cnt.plot(frame_pos, [len(x) for x in filtered_coordinates])
 
@@ -172,24 +175,24 @@ def det_plot((epoch_dir, epoch_config_filename, results),
             if len(coord[i]) > 0:
                 coord_means[i] = env.gc.image_to_real(*np.mean(np.fliplr(coord[i]), 
                                                                axis=0))
-
         ax.plot(frame_pos, truth_interp[frame_pos]['x'], c='b')
         ax.plot(frame_pos, truth_interp[frame_pos]['y'], c='r')
         ax.scatter(frame_pos, coord_means[:, 0], c='b', linewidth=0, s=4)
         ax.scatter(frame_pos, coord_means[:, 1], c='r', linewidth=0, s=4)
         ax.set_xlim(np.min(frame_pos), np.max(frame_pos))
+        
 
-    thetas_est = np.zeros(FRAMEN)
-    for i in range(FRAMEN):
-        c = filtered_coordinates[i]
-        if len(c) > 1:
-            fc = np.fliplr(c)
-            U, s, V = np.linalg.svd(fc)
-
-            theta = np.arctan2(V[1,0], V[0, 0])
-            thetas_est[i] = theta
-    ax_phi.scatter(frame_pos, thetas_est)
-
+    # plot the detected points
+    a = np.hstack(filtered_regions[::FRAME_SUBSAMPLE])
+    ax_points.imshow(a, interpolation='nearest')# , cmap=pylab.cm.gray)    
+    for pi, points in enumerate(filtered_coordinates[::FRAME_SUBSAMPLE]):
+        FRAME_W = frames[0].shape[1]
+        ax_points.plot([p[1]+FRAME_W * pi for p in points], 
+                       [p[0] for p in points], 'r.', ms=1.0)
+    ax_points.set_xlim([0, a.shape[1]])
+    ax_points.set_ylim([0, a.shape[0]])
+    ax_points.set_xticks([])
+    ax_points.set_yticks([])
     pylab.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     pylab.savefig(all_plot_filename, dpi=300)
 
