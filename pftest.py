@@ -1,4 +1,4 @@
-import numpy as np
+0import numpy as np
 import cPickle as pickle
 from matplotlib import pylab
 

@@ -36,11 +36,14 @@ def params():
               'bukowski_05.linear', 
               'Cummings_03.w2', 
               'Cummings_03.linear', 
+              'Dickinson_02.c', 
+              'H206.1', 
+              'H206.2'
               ]
     #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
     
     np.random.seed(0)
-    FRAMES = [(0, 200)]
+    FRAMES = [(0, 1000), (4000, 5000)]
 
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
@@ -54,7 +57,8 @@ def params():
             yield (infile, outfile, epoch, 
                    frame_start, frame_end)
            
-        
+ 
+       
 @files(params)
 def det_run((epoch_dir, epoch_config_filename, 
             region_filename, led_params_filename), outfile, 
@@ -70,6 +74,8 @@ def det_run((epoch_dir, epoch_config_filename,
     led_params = pickle.load(open(led_params_filename, 'r'))
 
     #eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params))
+    if frame_end > cf['end_f']:
+        frame_end = cf['end_f']
 
     frame_pos = np.arange(frame_start, frame_end)
     # load frames
@@ -85,6 +91,7 @@ def det_run((epoch_dir, epoch_config_filename,
                        dtype=np.uint8)
 
     for fi, frame in enumerate(frames):
+        print fi, frame_pos[fi]
         abs_frame_index = frame_pos[fi]
 
         for thold in THOLDS:
@@ -184,7 +191,7 @@ def det_plot((epoch_dir, epoch_config_filename, results),
 
     # plot the detected points
     a = np.hstack(filtered_regions[::FRAME_SUBSAMPLE])
-    ax_points.imshow(a, interpolation='nearest')# , cmap=pylab.cm.gray)    
+    ax_points.imshow(a>0, interpolation='nearest', vmin=0, vmax=1, cmap=pylab.cm.gray)    
     for pi, points in enumerate(filtered_coordinates[::FRAME_SUBSAMPLE]):
         FRAME_W = frames[0].shape[1]
         ax_points.plot([p[1]+FRAME_W * pi for p in points], 

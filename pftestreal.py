@@ -78,7 +78,7 @@ DECENT_DATA = ['Bukowski_03.W2',
                'Bukowski_03.W1']
 
 def params():
-    PARTICLEN = 1000
+    PARTICLEN = 100
     #frame_start, frame_end work like python
     FRAMES = [(0, 200)]
     EPOCHS = [
@@ -88,7 +88,7 @@ def params():
         #       'bukowski_04.W1', 
         #       'bukowski_04.W2',
               'bukowski_01.linear', 
-              'Cummings_03.linear', 
+              'Cummings_05.w1', 
               # 'bukowski_01.W1', 
               # 'bukowski_01.W2', 
               # 'bukowski_05.linear', 
