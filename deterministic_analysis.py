@@ -10,6 +10,7 @@ import time
 from matplotlib import pylab
 import os
 import skimage.feature
+import datasets
 
 import filters
 
@@ -25,25 +26,25 @@ def clear_ticks(ax):
     ax.set_yticks([])
 
 def params():
-    EPOCHS = ['bukowski_05.W1', 
-              'bukowski_02.W1', 
-              'bukowski_02.C', 
-              'bukowski_04.W1', 
-              'bukowski_04.W2',
-              'bukowski_01.linear', 
-              'bukowski_01.W1', 
-              'bukowski_01.C', 
-              'bukowski_05.linear', 
-              'Cummings_03.w2', 
-              'Cummings_03.linear', 
-              'Dickinson_02.c', 
-              'H206.1', 
-              'H206.2'
-              ]
-    #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    # EPOCHS = ['bukowski_05.W1', 
+    #           'bukowski_02.W1', 
+    #           'bukowski_02.C', 
+    #           'bukowski_04.W1', 
+    #           'bukowski_04.W2',
+    #           'bukowski_01.linear', 
+    #           'bukowski_01.W1', 
+    #           'bukowski_01.C', 
+    #           'bukowski_05.linear', 
+    #           'Cummings_03.w2', 
+    #           'Cummings_03.linear', 
+    #           'Dickinson_02.c', 
+    #           'H206.1', 
+    #           'H206.2'
+    #           ]
+    EPOCHS = datasets.CURRENT_EPOCHS
     
     np.random.seed(0)
-    FRAMES = [(0, 1000), (4000, 5000)]
+    FRAMES = datasets.CURRENT_FRAMES
 
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
@@ -101,7 +102,7 @@ def det_run((epoch_dir, epoch_config_filename,
                                                           min_distance=10, 
                                                           threshold_abs=220))
 
-        frame_regions = filters.label_regions(frame)
+        frame_regions = filters.label_regions(frame, mark_min=120, mark_max=220)
         regions[fi] = frame_regions
         
     pickle.dump({'frame_pos' : frame_pos, 
@@ -163,7 +164,6 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     filtered_coordinates = []
     for fi, f in enumerate(frame_pos):
         filtered_regions[fi] = filters.filter_regions(regions[fi], 
-                                                  size_thold = 3000, 
                                                   max_width = 40,
                                                   max_height=40)
         fc = filters.points_in_mask(filtered_regions[fi] > 0, 

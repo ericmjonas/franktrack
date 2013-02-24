@@ -156,6 +156,8 @@ class LikelihoodEvaluator2(object):
         else:
             self.sim_params = sim_params
 
+        self.cached_img = None
+        self.cachehd_img_thold = None
     def score_state(self, state, img):
         return self.score_state_full(state, img)
 
@@ -167,9 +169,14 @@ class LikelihoodEvaluator2(object):
         theta = state['theta']
         phi = state['phi']
 
-        img_thold = img.copy()
-        img_thold[img_thold < self.sim_params['pix-threshold']] = 0
+        if self.cached_img == None or (self.cached_img != img).any():
+            width = (self.template_obj.length + self.template_obj.front_size + self.template_obj.back_size ) * 1.5
+            regions = filters.extract_region_filter(img, width) # FIXME add the tholds
+            img_thold = (regions > 0).astype(np.uint8)*255
+            self.cached_img = img
+            self.cached_img_thold = img_thold
 
+        img_thold = self.cached_img_thold
         x_pix, y_pix = self.env.gc.real_to_image(x, y)
         x_pix = int(x_pix)
         y_pix = int(y_pix)

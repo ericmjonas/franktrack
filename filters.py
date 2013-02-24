@@ -22,7 +22,7 @@ def label_regions(im, mark_min=200, mark_max=230):
     return labeled_regions
 
 
-def filter_regions(labeled_regions, size_thold = 300, max_width=30, max_height=30):
+def filter_regions(labeled_regions, max_width=30, max_height=30):
     """
     filter out the regions that exceed the criteria 
     """
@@ -31,10 +31,6 @@ def filter_regions(labeled_regions, size_thold = 300, max_width=30, max_height=3
     region_cnt = np.max(labeled_regions) 
     for ri in range(1, region_cnt +1):
         region_where = regions== ri
-        
-        region_size = np.sum(region_where)
-        if region_size > size_thold:
-            regions[region_where] = 0
         
         x_axis = np.argwhere(np.sum(region_where, axis=0) > 0)
         width = np.max(x_axis) - np.min(x_axis)
@@ -54,32 +50,15 @@ def points_in_mask(mask, coords):
             out_coords.append(coord)
     return np.array(out_coords)
 
-def peak_region_filter(img, region_threshold):
+def peak_region_filter(img):
 
     coordinates = skimage.feature.peak_local_max(img, 
                                                  min_distance=30, 
                                                  threshold_rel=0.8)
-    img_thold = img > region_threshold
-    #pylab.subplot(2, 2, 1)
-    #pylab.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
-    #pylab.subplot(2, 2, 2)
-    #pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
-
-    #pylab.subplot(2, 2, 3)
-    #pylab.imshow(img, interpolation='nearest', cmap=pylab.cm.gray)
-    #pylab.plot([p[1] for p in coordinates], [p[0] for p in coordinates], 'r.')
-    #pylab.subplot(2, 2, 4)
-    #pylab.imshow(frame_regions)
-    
-    #pylab.plot([p[1] for p in fc], [p[0] for p in fc], 'r.')
-
-    #pylab.show()
-
 
     frame_regions = label_regions(img)
     
     filtered_regions = filter_regions(frame_regions, 
-                                      size_thold = 300, 
                                       max_width = 30,
                                       max_height=30)
     fc = points_in_mask(filtered_regions > 0, 
@@ -87,4 +66,19 @@ def peak_region_filter(img, region_threshold):
 
     
     return fc
+    
+def extract_region_filter(img, size_thold,
+                          mark_min=200, mark_max=230):
+    """
+    For a given image, use watershed/thresholding to extract out the regions
+    and then return the segmented, filtered regions
+    
+    """
+
+    frame_regions = label_regions(img)
+    
+    filtered_regions = filter_regions(frame_regions, 
+                                      max_width = size_thold,
+                                      max_height=size_thold)
+    return filtered_regions
     

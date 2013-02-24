@@ -21,6 +21,7 @@ import ssm
 import proposals
 import filters
 import skimage.feature
+import datasets
 
 from ruffus import * 
 
@@ -60,7 +61,7 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
+def enlarge_sep(eo_params, amount=1.2, front_amount = 1.4, back_amount=1.4):
     
     b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
@@ -80,22 +81,10 @@ DECENT_DATA = ['Bukowski_03.W2',
 def params():
     PARTICLEN = 100
     #frame_start, frame_end work like python
-    FRAMES = [(0, 200)]
-    EPOCHS = [
-        # 'bukowski_05.W1', 
-        #       'bukowski_02.W1', 
-        #       'bukowski_02.W2', 
-        #       'bukowski_04.W1', 
-        #       'bukowski_04.W2',
-              'bukowski_01.linear', 
-              'Cummings_05.w1', 
-              # 'bukowski_01.W1', 
-              # 'bukowski_01.W2', 
-              # 'bukowski_05.linear', 
-              ]
+    FRAMES = datasets.CURRENT_FRAMES
     np.random.seed(0)
-    
-    #EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    #EPOCHS = datasets.HARD_EPOCHS
+    EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
     #EPOCHS = np.random.permutation(EPOCHS)
     #EPOCHS= EPOCHS[:28] # should take ~5 min
     posnoise = 0.01
@@ -103,7 +92,7 @@ def params():
     
     for epoch in EPOCHS:
         for frame_start, frame_end in FRAMES:
-            for pix_threshold in [240]:
+            for pix_threshold in [230]:
                 for likeli_name, likeli_params in LIKELIHOOD_CONFIGS:
                     
                     infile = [os.path.join(FL_DATA, epoch), 
@@ -152,7 +141,7 @@ def pf_run((epoch_dir, epoch_config_filename,
 
     tr = TemplateObj()
     tr.set_params(*eoparams)
-    
+
     cle = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
                                           sim_params = {'power' : 1.0, 
                                                         'pix-threshold' : pix_threshold})
@@ -189,15 +178,10 @@ def pf_run((epoch_dir, epoch_config_filename,
 
     y = frames
 
-    prop1 = proposals.HigherIsotropicAndData(env, lambda x: filters.peak_region_filter(x, pix_threshold))
-    prop2 = proposals.HigherIsotropic()
+    #prop2 = proposals.HigherIsotropic()
 
-    prop = ssm.proposal.MixtureProposalKernel([prop1, prop2], [0.8, 0.2])
-
-
-    unnormed_weights, particles, ancestors = pf.arbitrary_prop(y, model_inst, 
-                                                               prop, 
-                                                               PARTICLEN)
+    unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
+                                                          PARTICLEN)
     # unnormed_weights, particles, ancestors = pf.bootstrap(y, model_inst, 
     #                                                      PARTICLEN)
     np.savez_compressed(outfile, 

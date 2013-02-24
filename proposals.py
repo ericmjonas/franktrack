@@ -12,6 +12,8 @@ import numpy as np
 import util2 as util
 import model
 import drift_reject
+from matplotlib import pylab
+import matplotlib
 
 class HigherIsotropic(ssm.proposal.Proposal):
     """
@@ -149,7 +151,7 @@ class HigherIsotropicAndData(object):
             points[:] = [self.env.gc.image_to_real(*x) for x in np.fliplr(fc)]
         
             means = np.mean(points, axis=0)
-            vars = np.var(points, axis=0)
+            vars = np.var(points, axis=0)*10
             return means, vars
         else:
             return None, None
@@ -159,6 +161,18 @@ class HigherIsotropicAndData(object):
             return self.gaussians[n]
         else:
             m, v = self.compute_gaussian_interest(y)
+            std = np.sqrt(v)
+            pos_x, pos_y = self.env.gc.real_to_image(m[0], m[1])
+            std_x, std_y = self.env.gc.real_to_image(std[0], std[1])
+            # ax = pylab.subplot(1, 1, 1)
+            # ax.imshow(y)
+            # print "V=", v
+            # e = matplotlib.patches.Ellipse((pos_x, pos_y), width= std_x, 
+            #                                height=std_y)
+            # ax.add_artist(e)
+            # ax.axhline(pos_y)
+            # ax.axvline(pos_x)
+            # pylab.show()
             self.gaussians[n] = m, v
             return m, v
         
