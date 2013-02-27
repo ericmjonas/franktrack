@@ -129,8 +129,8 @@ class TemplateRenderGaussian(object):
 class TemplateRenderCircleBorder(object):
     """
     """
-    def __init__(self):
-        pass
+    def __init__(self, border=0.6):
+        self.border = border
 
     def set_params(self, length, front_size, back_size):
         
@@ -162,13 +162,13 @@ class TemplateRenderCircleBorder(object):
 
         front_pos = pos_to_int(front_pos)
         back_pos = pos_to_int(back_pos)
-        BORDER = 0.6
         for i, size, pos in [(0, self.front_size, front_pos), 
                              (1, self.back_size, back_pos)]:
             template[i] = util.render_hat_ma_fast(H, W, pos[1], pos[0], 
-                                                  size, BORDER)
+                                                  size, self.border)
 
-        t =  np.sum(template, axis=0)
+        t =  np.sum(template, axis=0) 
+        t[t > 0.1] = 1.0
 
         return t
 

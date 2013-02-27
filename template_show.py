@@ -3,10 +3,10 @@ import template
 from matplotlib import pylab
 
 LENGTH = 14
-FRONT_SIZE = 3
-BACK_SIZE = 2
+FRONT_SIZE = 4
+BACK_SIZE = 3
 
-tr = template.TemplateRenderCircleBorder()
+tr = template.TemplateRenderCircleBorder(3.0)
 
 tr.set_params(LENGTH, FRONT_SIZE, BACK_SIZE)
 
