@@ -161,20 +161,25 @@ class HigherIsotropicAndData(object):
             return self.gaussians[n]
         else:
             m, v = self.compute_gaussian_interest(y)
-            std = np.sqrt(v)
-            pos_x, pos_y = self.env.gc.real_to_image(m[0], m[1])
-            std_x, std_y = self.env.gc.real_to_image(std[0], std[1])
-            # ax = pylab.subplot(1, 1, 1)
-            # ax.imshow(y)
-            # print "V=", v
-            # e = matplotlib.patches.Ellipse((pos_x, pos_y), width= std_x, 
-            #                                height=std_y)
-            # ax.add_artist(e)
-            # ax.axhline(pos_y)
-            # ax.axvline(pos_x)
-            # pylab.show()
-            self.gaussians[n] = m, v
-            return m, v
+            print "V=", v
+            if v == None:
+                self.gaussians[n] = None, None
+                return None, None
+            else:
+                std = np.sqrt(v)
+                pos_x, pos_y = self.env.gc.real_to_image(m[0], m[1])
+                std_x, std_y = self.env.gc.real_to_image(std[0], std[1])
+                # ax = pylab.subplot(1, 1, 1)
+                # ax.imshow(y)
+                # print "V=", v
+                # e = matplotlib.patches.Ellipse((pos_x, pos_y), width= std_x, 
+                #                                height=std_y)
+                # ax.add_artist(e)
+                # ax.axhline(pos_y)
+                # ax.axvline(pos_x)
+                # pylab.show()
+                self.gaussians[n] = m, v
+                return m, v
         
     def sample(self, y, x_prev, n):
         """

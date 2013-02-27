@@ -1,3 +1,7 @@
+import glob
+import os
+import cPickle as pickle
+
 CURRENT_EPOCHS = [
     'bukowski_05.W1', 
     'bukowski_02.W1', 
@@ -27,6 +31,13 @@ HARD_EPOCHS = ['Dickinson_01.w1',
              'Dickinson_04.c', 
              'Cummings_06.w1']
 
-CURRENT_FRAMES = [(0, 500), 
-                  (500, 1000), 
-                  (1000, 1500)]
+CURRENT_FRAMES = [0, 500, 1000]
+
+def all():
+    EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    for epoch in EPOCHS:
+        for frame in CURRENT_FRAMES:
+            yield epoch, frame
+
+def bad():
+    return pickle.load(open('currentset.pickle', 'r'))['bad_epochs']

@@ -173,6 +173,8 @@ class LikelihoodEvaluator2(object):
             width = (self.template_obj.length + self.template_obj.front_size + self.template_obj.back_size ) * 1.5
             regions = filters.extract_region_filter(img, width) # FIXME add the tholds
             img_thold = (regions > 0).astype(np.uint8)*255
+            # pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
+            # pylab.show()
             self.cached_img = img
             self.cached_img_thold = img_thold
 
@@ -261,7 +263,6 @@ class LikelihoodEvaluator3(object):
             frame_regions = filters.label_regions(img_thold)
 
             filtered_regions = filters.filter_regions(frame_regions, 
-                                                      size_thold = 300, 
                                                       max_width = 30,
                                                       max_height=30)
             fc = filters.points_in_mask(filtered_regions > 0, 

@@ -46,17 +46,19 @@ def params():
     np.random.seed(0)
     FRAMES = datasets.CURRENT_FRAMES
 
-    for epoch in EPOCHS:
-        for frame_start, frame_end in FRAMES:
-            infile = [os.path.join(FL_DATA, epoch), 
-                      os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                      os.path.join(FL_DATA, epoch, 'region.pickle'), 
-                      os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
-                      ]
-            
-            outfile = 'deterministic.%s.%d-%d.pickle' % (epoch, frame_start, frame_end)
-            yield (infile, outfile, epoch, 
-                   frame_start, frame_end)
+    # for epoch in EPOCHS:
+    #     for frame_start, frame_end in FRAMES:
+    for epoch, frame_start in pickle.load(open('currentset.pickle', 'r'))['bad_epochs']:
+        frame_end = frame_start + 500
+        infile = [os.path.join(FL_DATA, epoch), 
+                  os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                  os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                  os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
+                  ]
+
+        outfile = 'deterministic.%s.%d-%d.pickle' % (epoch, frame_start, frame_end)
+        yield (infile, outfile, epoch, 
+               frame_start, frame_end)
            
  
        
