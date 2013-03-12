@@ -55,8 +55,8 @@ def peak_region_filter(img):
     coordinates = skimage.feature.peak_local_max(img, 
                                                  min_distance=30, 
                                                  threshold_rel=0.8)
-
-    frame_regions = label_regions(img)
+    
+    frame_regions = label_regions(img, mark_min=120, mark_max=200)
     
     filtered_regions = filter_regions(frame_regions, 
                                       max_width = 30,

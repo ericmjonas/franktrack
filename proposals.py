@@ -151,7 +151,9 @@ class HigherIsotropicAndData(object):
             points[:] = [self.env.gc.image_to_real(*x) for x in np.fliplr(fc)]
         
             means = np.mean(points, axis=0)
-            vars = np.var(points, axis=0)*10
+            vars = np.var(points, axis=0)
+            vars = np.maximum(vars, np.ones_like(vars)*0.001)
+            print "Variance is", vars
             return means, vars
         else:
             return None, None

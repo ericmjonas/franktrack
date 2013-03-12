@@ -170,7 +170,7 @@ class LikelihoodEvaluator2(object):
         phi = state['phi']
 
         if self.cached_img == None or (self.cached_img != img).any():
-            width = (self.template_obj.length + self.template_obj.front_size + self.template_obj.back_size ) * 1.5
+            width = (self.template_obj.front_size + self.template_obj.back_size ) * 1.5
             regions = filters.extract_region_filter(img, width) # FIXME add the tholds
             img_thold = (regions > 0).astype(np.uint8)*255
             # pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
@@ -195,6 +195,13 @@ class LikelihoodEvaluator2(object):
             delta = (template_region - img_region.astype(np.float32))
             s = - np.sum((delta)**self.sim_params['power']) 
             s = s / tr_size
+            # pylab.figure()
+            # pylab.subplot(1, 2, 1)
+            # pylab.imshow(template_region)
+            # pylab.subplot(1, 2, 2)
+            # pylab.imshow(img_region)
+            # pylab.title("score=%f" % s)
+            # pylab.show()
         elif self.similarity == "normcc":
             """
             http://en.wikipedia.org/wiki/Cross-correlation#Normalized_cross-correlation
@@ -388,7 +395,6 @@ class LikelihoodEvaluator4(object):
         # if count != 0:
         #     print x_pix, y_pix, "Points:", len(fpi), len(bpi), len(bi)
         return np.exp(count)
-
 
 if __name__ == "__main__":
     eo = EvaluateObj(320, 240)

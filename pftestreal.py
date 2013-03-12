@@ -61,18 +61,19 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.4, front_amount = 1.0, back_amount=1.0):
+def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
     
     b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
 
 def params():
-    PARTICLEN = 100
+    PARTICLEN = 200
     np.random.seed(0)
     posnoise = 0.01
     velnoise = 0.05
     
     for epoch, frame_start in datasets.bad():
+
         frame_end = frame_start + 100
         for pix_threshold in [230]:
             for config_name, config_params in LIKELIHOOD_CONFIGS:
@@ -120,50 +121,37 @@ def pf_run((epoch_dir, epoch_config_filename,
     led_params = pickle.load(open(led_params_filename, 'r'))
 
     eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params))
-
-    tr = TemplateObj()
+    #print "EO PARAMS ARE", eoparams
+    tr = TemplateObj(0.8)
     tr.set_params(*eoparams)
-
-    cle = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
+    
+    le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
                                           sim_params = {'power' : 1.0, 
                                                         'pix-threshold' : pix_threshold})
     
-    #cle = likelihood.LikelihoodEvaluator3(env, tr, params=config_params)
+    #le2 = likelihood.LikelihoodEvaluator3(env, tr, params=config_params)
+    
 
-    #cle = CombinedLE([le2], [1.0])
 
-    model_inst = model.CustomModel(env, cle, 
+    model_inst = model.CustomModel(env, le1, 
                                    POS_NOISE_STD=posnoise,
                                    VELOCITY_NOISE_STD=velnoise)
     frame_pos = np.arange(frame_start, frame_end)
     # load frames
     frames = organizedata.get_frames(epoch_dir, frame_pos)
-    for fi, f in enumerate(frames):
-        pix_ul = list(env.gc.real_to_image(region['x_pos_min'], 
-                                           region['y_pos_min']))
-        if pix_ul[1] <0 :
-            pix_ul[1] = 0
-        if pix_ul[0] < 0:
-            pix_ul[0] = 0
-
-        frames[fi][:pix_ul[1], :] = 0
-        frames[fi][:, :pix_ul[0]] = 0
-
-        pix_lr = env.gc.real_to_image(region['x_pos_max'], 
-                                   region['y_pos_max'])
-        
-        frames[fi][pix_lr[1]:, :] = 0
-        frames[fi][:, pix_lr[0]:] = 0
-
-
-        
 
     y = frames
 
     prop2 = proposals.HigherIsotropic()
+    def img_to_points(img):
+        return filters.peak_region_filter(img)
+        
+    prop3 = proposals.HigherIsotropicAndData(env, img_to_points)
+    mpk = ssm.proposal.MixtureProposalKernel([prop2, prop3], 
+                                             [0.5, 0.5])
 
     unnormed_weights, particles, ancestors = pf.arbitrary_prop(y, model_inst, 
-                                                               prop2,
+                                                               mpk,
                                                                PARTICLEN)
     
     np.savez_compressed(outfile, 
@@ -179,6 +167,7 @@ def params_rendered():
                                            p[1] + ".examples.png", 
                                            p[1] + ".stats.pickle"), 
                                            p[2:])
+
 
 @follows(pf_run)
 @files(params_rendered)
@@ -482,13 +471,18 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
 
         # filtered image
-        coordinates = skimage.feature.peak_local_max(frames[fi], 
-                                                     min_distance=50, 
-                                                     threshold_rel=0.8)
-        ax_filt.imshow(frames[fi].copy(), 
-                         interpolation='nearest', cmap=pylab.cm.gray)
+        coordinates = filters.peak_region_filter(frames[fi])
+        r_width = (tr.length + tr.front_size + tr.back_size )*1.5
+        regions = filters.extract_region_filter(frames[fi], r_width)
+        ax_filt.imshow(regions,
+                       interpolation='nearest') # , cmap=pylab.cm.gray)
 
-        ax_filt.plot([p[1] for p in coordinates], [p[0] for p in coordinates], 'r.')
+        #ax_filt.plot([p[1] for p in coordinates], [p[0] for p in coordinates], 'r.')
+        ax_filt.set_title('ax_filt')
+        # plot the mean
+        if len(coordinates) > 0:
+            ax_filt.axhline(coordinates.mean(axis=0)[0])
+            ax_filt.axvline(coordinates.mean(axis=0)[1])
 
         frames[fi][frames[fi] < pix_threshold] = 0
         ax_particles.imshow(frames[fi], 
@@ -574,8 +568,8 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         plot_filename = "%s.%08d.png" % (vid_filename, fi)
         f.savefig(plot_filename, dpi=200)
         plot_temp_filenames.append(plot_filename)
-
-    video.frames_to_mpng("%s.*.png" % vid_filename, vid_filename)
+        
+    video.frames_to_mpng("%s.*.png" % vid_filename, vid_filename, fps = float(len(plot_temp_filenames))/10.0)
     # delete extras
     for f in plot_temp_filenames:
         os.remove(f)
@@ -607,5 +601,5 @@ def results_summarize(infiles, summary_file):
     df = pandas.DataFrame(df_rows)
     pickle.dump(df, open(summary_file, 'w'))
 
-pipeline_run([pf_run, pf_plot, #pf_render_vid, 
+pipeline_run([pf_run, pf_plot, pf_render_vid, 
               results_summarize], multiprocess=4)
