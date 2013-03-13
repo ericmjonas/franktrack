@@ -149,7 +149,7 @@ class HigherIsotropicAndData(object):
         points = np.zeros((len(fc), 2), dtype=np.float32)
         if len(fc) > 0:
             points[:] = [self.env.gc.image_to_real(*x) for x in np.fliplr(fc)]
-        
+            
             means = np.mean(points, axis=0)
             vars = np.var(points, axis=0)
             vars = np.maximum(vars, np.ones_like(vars)*0.001)
@@ -171,15 +171,25 @@ class HigherIsotropicAndData(object):
                 std = np.sqrt(v)
                 pos_x, pos_y = self.env.gc.real_to_image(m[0], m[1])
                 std_x, std_y = self.env.gc.real_to_image(std[0], std[1])
-                # ax = pylab.subplot(1, 1, 1)
-                # ax.imshow(y)
+
+                found_points = self.img_to_points(y)
+                # pylab.figure()
+                # ax = pylab.subplot(1, 2, 1)
+                # ax.imshow(y, interpolation='nearest', cmap=pylab.cm.gray)
                 # print "V=", v
                 # e = matplotlib.patches.Ellipse((pos_x, pos_y), width= std_x, 
                 #                                height=std_y)
                 # ax.add_artist(e)
                 # ax.axhline(pos_y)
                 # ax.axvline(pos_x)
+                # ax2 = pylab.subplot(1, 2, 2)
+                # ax2.imshow(y, interpolation='nearest', cmap=pylab.cm.gray)
+                # ax2.plot([p[1] for p in found_points], [p[0] for p in found_points], 'r.')
+
                 # pylab.show()
+
+
+
                 self.gaussians[n] = m, v
                 return m, v
         

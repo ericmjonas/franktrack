@@ -61,18 +61,18 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
+def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.5):
     
     b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
 
 def params():
-    PARTICLEN = 200
+    PARTICLEN = 1000
     np.random.seed(0)
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in datasets.bad():
+    for epoch, frame_start in datasets.bad(): # [('Cummings_07.w2', 1000)]: 
 
         frame_end = frame_start + 100
         for pix_threshold in [230]:
@@ -126,8 +126,8 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr.set_params(*eoparams)
     
     le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
-                                          sim_params = {'power' : 1.0, 
-                                                        'pix-threshold' : pix_threshold})
+                                         likeli_params = {'power' : 1.0, 
+                                                          'pix-threshold' : pix_threshold})
     
     #le2 = likelihood.LikelihoodEvaluator3(env, tr, params=config_params)
     
@@ -144,7 +144,7 @@ def pf_run((epoch_dir, epoch_config_filename,
 
     prop2 = proposals.HigherIsotropic()
     def img_to_points(img):
-        return filters.peak_region_filter(img)
+        return filters.peak_region_filter(img, min_distance=10)
         
     prop3 = proposals.HigherIsotropicAndData(env, img_to_points)
     mpk = ssm.proposal.MixtureProposalKernel([prop2, prop3], 
@@ -472,7 +472,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
         # filtered image
         coordinates = filters.peak_region_filter(frames[fi])
-        r_width = (tr.length + tr.front_size + tr.back_size )*1.5
+        r_width = (tr.front_size + tr.back_size )*1.5
         regions = filters.extract_region_filter(frames[fi], r_width)
         ax_filt.imshow(regions,
                        interpolation='nearest') # , cmap=pylab.cm.gray)
@@ -601,5 +601,5 @@ def results_summarize(infiles, summary_file):
     df = pandas.DataFrame(df_rows)
     pickle.dump(df, open(summary_file, 'w'))
 
-pipeline_run([pf_run, pf_plot, pf_render_vid, 
+pipeline_run([pf_run, pf_plot, # pf_render_vid, 
               results_summarize], multiprocess=4)

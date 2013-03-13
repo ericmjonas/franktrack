@@ -145,16 +145,20 @@ class EvaluateObj(object):
 
 class LikelihoodEvaluator2(object):
     def __init__(self, env, template_obj, similarity = 'dist', 
-                 sim_params = None):
+                 likeli_params = None):
         self.env = env
         self.template_obj = template_obj
         self.similarity = similarity
 
-        if sim_params == None:
-            self.sim_params = {'power' : 2, 
-                               'pix-threshold' : 0}
-        else:
-            self.sim_params = sim_params
+        self.likeli_params = {'power' : 2, 
+                              'pix-threshold' : 0, 
+                              'mark-min' : 120, 
+                              'mark-max' : 230}
+        width = (self.template_obj.front_size + self.template_obj.back_size ) * 1.5
+        self.likeli_params['region-size-thold'] = width
+
+        if likeli_params != None:
+            self.likeli_params.update(likeli_params)
 
         self.cached_img = None
         self.cachehd_img_thold = None
@@ -170,9 +174,11 @@ class LikelihoodEvaluator2(object):
         phi = state['phi']
 
         if self.cached_img == None or (self.cached_img != img).any():
-            width = (self.template_obj.front_size + self.template_obj.back_size ) * 1.5
-            regions = filters.extract_region_filter(img, width) # FIXME add the tholds
-            img_thold = (regions > 0).astype(np.uint8)*255
+            regions = filters.extract_region_filter(img, self.likeli_params['region-size-thold'], mark_min = self.likeli_params['mark-min'], 
+                                                    mark_max = self.likeli_params['mark-max'])
+                                                    
+            img_thold = (regions > 0).astype(np.uint8)*25
+            # pylab.figure()
             # pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
             # pylab.show()
             self.cached_img = img
@@ -193,7 +199,7 @@ class LikelihoodEvaluator2(object):
             if tr_size == 0:
                 return MINSCORE
             delta = (template_region - img_region.astype(np.float32))
-            s = - np.sum((delta)**self.sim_params['power']) 
+            s = - np.sum((delta)**self.likeli_params['power']) 
             s = s / tr_size
             # pylab.figure()
             # pylab.subplot(1, 2, 1)
@@ -222,8 +228,8 @@ class LikelihoodEvaluator2(object):
 
             s = s / (template_std * img_std)
             s = s / tr_size
-            if 'scalar' in self.sim_params:
-                s = s * self.sim_params['scalar']
+            if 'scalar' in self.likeli_params:
+                s = s * self.likeli_params['scalar']
             if not np.isfinite(s):
                 return MINSCORE
 

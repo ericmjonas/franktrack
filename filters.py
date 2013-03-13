@@ -50,17 +50,20 @@ def points_in_mask(mask, coords):
             out_coords.append(coord)
     return np.array(out_coords)
 
-def peak_region_filter(img):
+def peak_region_filter(img, min_distance=30, threshold_rel=0.8, 
+                       min_mark = 120, 
+                       max_mark = 200, 
+                       size_thold = 30):
 
     coordinates = skimage.feature.peak_local_max(img, 
-                                                 min_distance=30, 
-                                                 threshold_rel=0.8)
+                                                 min_distance=min_distance, 
+                                                 threshold_rel=threshold_rel)
     
-    frame_regions = label_regions(img, mark_min=120, mark_max=200)
+    frame_regions = label_regions(img, mark_min=min_mark, mark_max=max_mark)
     
     filtered_regions = filter_regions(frame_regions, 
-                                      max_width = 30,
-                                      max_height=30)
+                                      max_width = size_thold,
+                                      max_height= size_thold)
     fc = points_in_mask(filtered_regions > 0, 
                         coordinates)
 
@@ -75,10 +78,11 @@ def extract_region_filter(img, size_thold,
     
     """
 
-    frame_regions = label_regions(img)
+    frame_regions = label_regions(img, mark_min=mark_min, 
+                                  mark_max = mark_max)
     
     filtered_regions = filter_regions(frame_regions, 
                                       max_width = size_thold,
-                                      max_height=size_thold)
+                                      max_height = size_thold)
     return filtered_regions
     
