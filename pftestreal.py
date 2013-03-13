@@ -61,18 +61,19 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.5):
+def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
     
     b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
 
 def params():
-    PARTICLEN = 1000
+    PARTICLEN = 100
     np.random.seed(0)
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in datasets.bad(): # [('Cummings_07.w2', 1000)]: 
+    for epoch, frame_start in [('Cummings_07.w2', 1000)]:
+                               #("I106.4", 0)]: 
 
         frame_end = frame_start + 100
         for pix_threshold in [230]:
@@ -432,6 +433,8 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     ax_particles_global = pylab.subplot(2, 3, 3)
     ax_rawvid = pylab.subplot(2, 3, 4)
     ax_filt = pylab.subplot(2, 3, 5)
+    ax_scale_bars = pylab.subplot(2,3, 6)
+
     plot_temp_filenames = []
     for fi in range(N):
         abs_frame = frame_pos[fi] # absolute frame position
@@ -440,6 +443,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         ax_rawvid.clear()
         ax_filt.clear()
         ax_particles_global.clear()
+        ax_scale_bars.clear()
 
         true_x = truth['x'][abs_frame]
         true_y = truth['y'][abs_frame]
@@ -464,8 +468,9 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
         ax_est.imshow(frames[fi], 
                   interpolation='nearest', cmap=pylab.cm.gray)
-
-
+        ax_scale_bars.imshow(frames[fi].copy(), 
+                             interpolation='nearest', cmap=pylab.cm.gray)
+        
         ax_rawvid.imshow(frames[fi].copy(), 
                          interpolation='nearest', cmap=pylab.cm.gray)
 
@@ -550,12 +555,27 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                              linewidth=0, 
                              alpha = 1.0, c='r', s=2)
 
-        for ax in [ax_est, ax_particles]:
+        for ax in [ax_est, ax_particles, ax_scale_bars]:
             ax.set_xlim((true_x_pix - WINDOW_PIX, true_x_pix + WINDOW_PIX))
             ax.set_ylim((true_y_pix - WINDOW_PIX, true_y_pix + WINDOW_PIX))
             ax.set_xticks([])
             ax.set_yticks([])
             ax.set_title(frame_pos[fi])
+
+        bar_offset_x = 5 + true_x_pix - WINDOW_PIX
+        bar_offset_y = true_y_pix - WINDOW_PIX
+        ax_scale_bars.plot([bar_offset_x, 
+                            eoparams[0] + bar_offset_x], 
+                           [bar_offset_y + 5, bar_offset_y + 5], 
+                           c='b', linewidth=5)
+        ax_scale_bars.plot([bar_offset_x, 
+                            eoparams[1]*2 + bar_offset_x], 
+                           [bar_offset_y + 10, bar_offset_y + 10], 
+                           c='g', linewidth=3)
+        ax_scale_bars.plot([bar_offset_x, 
+                            eoparams[2]*2 + bar_offset_x], 
+                           [bar_offset_y + 15, bar_offset_y + 15], 
+                           c='r', linewidth=3)
 
         ax_rawvid.set_xticks([])
         ax_rawvid.set_yticks([])
@@ -564,7 +584,6 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
         ax_particles_global.set_xticks([])
         ax_particles_global.set_yticks([])
-
         plot_filename = "%s.%08d.png" % (vid_filename, fi)
         f.savefig(plot_filename, dpi=200)
         plot_temp_filenames.append(plot_filename)
@@ -601,5 +620,5 @@ def results_summarize(infiles, summary_file):
     df = pandas.DataFrame(df_rows)
     pickle.dump(df, open(summary_file, 'w'))
 
-pipeline_run([pf_run, pf_plot, # pf_render_vid, 
+pipeline_run([pf_run, pf_plot, pf_render_vid, 
               results_summarize], multiprocess=4)
