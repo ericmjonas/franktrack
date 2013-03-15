@@ -41,3 +41,9 @@ def all():
 
 def bad():
     return pickle.load(open('currentset.pickle', 'r'))['bad_epochs']
+
+def current():
+    return [('Cummings_07.w2', 1000), 
+            ('Cummings_08.linear', 0), 
+            ('I106.4', 0), 
+            ('Cummings_06.w2', 500)]

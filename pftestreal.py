@@ -67,13 +67,12 @@ def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
     return b
 
 def params():
-    PARTICLEN = 100
+    PARTICLEN = 2000
     np.random.seed(0)
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in [('Cummings_07.w2', 1000)]:
-                               #("I106.4", 0)]: 
+    for epoch, frame_start in datasets.bad():
 
         frame_end = frame_start + 100
         for pix_threshold in [230]:
@@ -133,7 +132,7 @@ def pf_run((epoch_dir, epoch_config_filename,
     #le2 = likelihood.LikelihoodEvaluator3(env, tr, params=config_params)
     
 
-
+    
     model_inst = model.CustomModel(env, le1, 
                                    POS_NOISE_STD=posnoise,
                                    VELOCITY_NOISE_STD=velnoise)

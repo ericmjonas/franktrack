@@ -153,7 +153,6 @@ class HigherIsotropicAndData(object):
             means = np.mean(points, axis=0)
             vars = np.var(points, axis=0)
             vars = np.maximum(vars, np.ones_like(vars)*0.001)
-            print "Variance is", vars
             return means, vars
         else:
             return None, None
@@ -273,3 +272,5 @@ class HigherIsotropicAndData(object):
 
 
         return score
+
+
