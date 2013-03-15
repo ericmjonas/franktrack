@@ -72,7 +72,8 @@ def params():
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in datasets.all():
+    for epoch, frame_start in [('Cummings_01.linear', 500), 
+                               ('Cummings_09.linear', 1000)]: #datasets.bad():
 
         frame_end = frame_start + 100
         for pix_threshold in [230]:

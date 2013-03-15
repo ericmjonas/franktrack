@@ -88,3 +88,18 @@ def extract_region_filter(img, size_thold,
     
 
 
+def canonicalize_regions(im_regions):
+    """
+    Take the region labels and turn them into a canonical set 
+    of 0, 1, 2, etc. 
+    """
+    
+
+    unique_regions = np.sort(np.unique(im_regions))
+    region_n = len(unique_regions)
+    missing = np.setdiff1d(np.arange(region_n), unique_regions)
+    new_r = im_regions.copy()
+    for m, u in zip(missing, unique_regions[-(len(missing)):]):
+        new_r[new_r == u] =m
+    return new_r
+

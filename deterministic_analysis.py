@@ -11,9 +11,10 @@ from matplotlib import pylab
 import os
 import skimage.feature
 import datasets
+import dettrack
 
 import filters
-
+import model
 
 from ruffus import * 
 
@@ -49,7 +50,7 @@ def params():
     # for epoch in EPOCHS:
     #     for frame_start, frame_end in FRAMES:
     for epoch, frame_start in datasets.bad():
-        frame_end = frame_start + 500
+        frame_end = frame_start + 100
         infile = [os.path.join(FL_DATA, epoch), 
                   os.path.join(FL_DATA, epoch, 'config.pickle'), 
                   os.path.join(FL_DATA, epoch, 'region.pickle'), 
@@ -92,6 +93,7 @@ def det_run((epoch_dir, epoch_config_filename,
     
     regions = np.zeros((FRAMEN, frames[0].shape[0], frames[0].shape[1]), 
                        dtype=np.uint8)
+    point_est_track_data = np.zeros(FRAMEN, dtype=model.DTYPE_LATENT_STATE)
 
     for fi, frame in enumerate(frames):
         print fi, frame_pos[fi]
@@ -106,12 +108,14 @@ def det_run((epoch_dir, epoch_config_filename,
 
         frame_regions = filters.label_regions(frame, mark_min=120, mark_max=220)
         regions[fi] = frame_regions
-        
+        point_est_track_data[fi] = dettrack.point_est_track2(frame, env, eo_params)
+
     pickle.dump({'frame_pos' : frame_pos, 
                  'tholds' : tholds, 
                  'coordinates' : coordinates, 
                  'regions' : regions, 
-                 'eo_params' : eo_params}, 
+                 'eo_params' : eo_params, 
+                 'point_est_track' : point_est_track_data}, 
                 open(outfile, 'w'))
 
 
@@ -151,7 +155,7 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     ax_coord_cnt = f1.add_subplot(ROWN, 1, 3)
     ax_coord_centroid = f1.add_subplot(ROWN, 1, 4)
     ax_coord_filt_mean = f1.add_subplot(ROWN, 1, 5)
-    ax_points = f1.add_subplot(ROWN, 1, 6)
+    ax_img_pos = f1.add_subplot(ROWN, 1, 6)
 
     a = np.hstack(frames[::FRAME_SUBSAMPLE])
     ax_frames.imshow(a, interpolation = 'nearest', 
@@ -166,9 +170,9 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     regions = data['regions']
     eo_params = data['eo_params']
     filtered_regions = np.zeros_like(data['regions'])
-    filtered_coordinates = []
+    point_est_track = data['point_est_track']
     region_props = []
-    max_dim = (eo_params[1] + eo_params[2])*1.5
+    max_dim = (eo_params[1] + eo_params[2])*2*1.2
     for fi, f in enumerate(frame_pos):
         filtered_regions[fi] = filters.filter_regions(regions[fi], 
                                                   max_width = max_dim, 
@@ -176,11 +180,10 @@ def det_plot((epoch_dir, epoch_config_filename, results),
         
         fc = filters.points_in_mask(filtered_regions[fi] > 0, 
                                                            coordinates[fi])
-        filtered_coordinates.append(fc)
         region_props.append(skimage.measure.regionprops((filtered_regions[fi]>0).astype(int)))
         
     ### how many coordinate points
-    ax_coord_cnt.plot(frame_pos, [len(x) for x in filtered_coordinates])
+    #ax_coord_cnt.plot(frame_pos, [len(x) for x in filtered_coordinates])
     ax_coord_cnt.plot(frame_pos, [len(x) for x in coordinates])
 
     ### Cooridnate centroid
@@ -196,32 +199,33 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     ax_coord_centroid.scatter(frame_pos, centroids[:, 1], c='r', linewidth=0, s=4)
     ax_coord_centroid.set_xlim(np.min(frame_pos), np.max(frame_pos))
     
-    for ax, coord in [ (ax_coord_filt_mean, filtered_coordinates)]:
-        ### what is the center of mass of the coordinates? 
-        coord_means = np.zeros((FRAMEN, 2))
-        for i in range(FRAMEN):
-            if len(coord[i]) > 0:
-                coord_means[i] = env.gc.image_to_real(*np.mean(np.fliplr(coord[i]), 
-                                                               axis=0))
+    for ax, coord in [ (ax_coord_filt_mean, point_est_track)]:
         ax.plot(frame_pos, truth_interp[frame_pos]['x'], c='b')
         ax.plot(frame_pos, truth_interp[frame_pos]['y'], c='r')
-        ax.scatter(frame_pos, coord_means[:, 0], c='b', linewidth=0, s=4)
-        ax.scatter(frame_pos, coord_means[:, 1], c='r', linewidth=0, s=4)
+        ax.scatter(frame_pos, coord['x'], c='b', linewidth=0, s=4)
+        ax.scatter(frame_pos, coord['y'], c='r', linewidth=0, s=4)
         ax.set_xlim(np.min(frame_pos), np.max(frame_pos))
         
                                  
                                 
     # plot the detected points
     a = np.hstack(filtered_regions[::FRAME_SUBSAMPLE])
-    ax_points.imshow(a>0, interpolation='nearest', vmin=0, vmax=1, cmap=pylab.cm.gray)    
-    for pi, points in enumerate(filtered_coordinates[::FRAME_SUBSAMPLE]):
-        FRAME_W = frames[0].shape[1]
-        ax_points.plot([p[1]+FRAME_W * pi for p in points], 
-                       [p[0] for p in points], 'r.', ms=1.0)
-    ax_points.set_xlim([0, a.shape[1]])
-    ax_points.set_ylim([0, a.shape[0]])
-    ax_points.set_xticks([])
-    ax_points.set_yticks([])
+    FRAME_W = frames[0].shape[1]
+    a_th = (a > 0 ).astype(np.uint8)*255
+    a[:, ::FRAME_W] = 200
+
+    ax_img_pos.imshow(a>0, interpolation='nearest', vmin=0, vmax=1, cmap=pylab.cm.gray)    
+    for pi, point in enumerate(point_est_track[::FRAME_SUBSAMPLE]):
+        # convert back to pix
+        pix_x, pix_y = env.gc.real_to_image(point['x'], point['y'])
+
+        ax_img_pos.plot([FRAME_W * pi + pix_x], 
+                        [pix_y], 'r.', ms=1.0)
+
+    ax_img_pos.set_xlim([0, a.shape[1]])
+    ax_img_pos.set_ylim([0, a.shape[0]])
+    ax_img_pos.set_xticks([])
+    ax_img_pos.set_yticks([])
     pylab.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     pylab.savefig(all_plot_filename, dpi=300)
 
