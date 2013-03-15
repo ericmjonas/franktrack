@@ -177,7 +177,8 @@ class LikelihoodEvaluator2(object):
             regions = filters.extract_region_filter(img, self.likeli_params['region-size-thold'], mark_min = self.likeli_params['mark-min'], 
                                                     mark_max = self.likeli_params['mark-max'])
                                                     
-            img_thold = (regions > 0).astype(np.uint8)*25
+            img_thold = (regions > 0).astype(np.uint8)*255
+            img_thold = scipy.ndimage.gaussian_filter(img_thold, 4.0)
             # pylab.figure()
             # pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
             # pylab.show()

@@ -86,3 +86,5 @@ def extract_region_filter(img, size_thold,
                                       max_height = size_thold)
     return filtered_regions
     
+
+

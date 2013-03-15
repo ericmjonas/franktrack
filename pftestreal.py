@@ -67,12 +67,12 @@ def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
     return b
 
 def params():
-    PARTICLEN = 2000
+    PARTICLEN = 200
     np.random.seed(0)
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in datasets.bad():
+    for epoch, frame_start in datasets.all():
 
         frame_end = frame_start + 100
         for pix_threshold in [230]:
