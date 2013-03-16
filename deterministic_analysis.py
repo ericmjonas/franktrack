@@ -26,6 +26,7 @@ def clear_ticks(ax):
     ax.set_xticks([])
     ax.set_yticks([])
 
+
 def params():
     # EPOCHS = ['bukowski_05.W1', 
     #           'bukowski_02.W1', 
@@ -49,7 +50,7 @@ def params():
 
     # for epoch in EPOCHS:
     #     for frame_start, frame_end in FRAMES:
-    for epoch, frame_start in datasets.bad():
+    for epoch, frame_start in datasets.all():
         frame_end = frame_start + 100
         infile = [os.path.join(FL_DATA, epoch), 
                   os.path.join(FL_DATA, epoch, 'config.pickle'), 

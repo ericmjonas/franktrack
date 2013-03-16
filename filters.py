@@ -66,7 +66,6 @@ def peak_region_filter(img, min_distance=30, threshold_rel=0.8,
                                       max_height= size_thold)
     fc = points_in_mask(filtered_regions > 0, 
                         coordinates)
-
     
     return fc
     

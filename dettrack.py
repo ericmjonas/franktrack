@@ -57,8 +57,8 @@ def find_possible_front_diodes(img, eo_params):
     DIODE_SEP = eo_params[0]
     FRONT_SIZE = float(eo_params[1])
     BACK_SIZE = float(eo_params[2])
-
-    size_thold = (FRONT_SIZE+BACK_SIZE+DIODE_SEP) * 1.2
+    print "FRONT_SIZE=", FRONT_SIZE, "BACK_SIZE=", BACK_SIZE
+    size_thold = (FRONT_SIZE+BACK_SIZE) * 2.5
 
 
     im_reg = filters.extract_region_filter(img, size_thold=size_thold, 
@@ -77,7 +77,7 @@ def find_possible_front_diodes(img, eo_params):
     # pylab.show()    
     coordinates = skimage.feature.peak_local_max(im_f, 
                                                  min_distance=FRONT_SIZE+BACK_SIZE, 
-                                                 threshold_rel=0.5)
+                                                 threshold_rel=0.7)
     return coordinates
 
 def dist(p1, p2):
@@ -92,7 +92,7 @@ def find_possible_back_diodes(img, eo_params, candidate_front_diodes):
     FRONT_SIZE = float(eo_params[1])
     BACK_SIZE = float(eo_params[2])
 
-    size_thold = 2*(FRONT_SIZE+BACK_SIZE+DIODE_SEP) * 1.2
+    size_thold = (FRONT_SIZE+BACK_SIZE) * 2.5
 
 
     im_reg = filters.extract_region_filter(img, size_thold=size_thold, 
@@ -118,7 +118,7 @@ def find_possible_back_diodes(img, eo_params, candidate_front_diodes):
     
         coordinates = skimage.feature.peak_local_max(im_f, 
                                                      min_distance=(FRONT_SIZE+BACK_SIZE), 
-                                                     threshold_rel=0.5)
+                                                     threshold_rel=0.7)
         out_coords.append(coordinates)
     return out_coords
     

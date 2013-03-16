@@ -72,10 +72,9 @@ def params():
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in [('Cummings_01.linear', 500), 
-                               ('Cummings_09.linear', 1000)]: #datasets.bad():
+    for epoch, frame_start in [('bukowski_05.linear', 0)]:
 
-        frame_end = frame_start + 100
+        frame_end = frame_start + 1000
         for pix_threshold in [230]:
             for config_name, config_params in LIKELIHOOD_CONFIGS:
 
