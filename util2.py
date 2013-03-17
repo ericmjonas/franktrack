@@ -184,3 +184,9 @@ def render_hat_ma_fast(H, W, x, y, size, BORDER):
     tm[a >= (size*(1.0+BORDER))] = ma.masked
 
     return tm
+
+def compute_phi(front_led, back_led):
+    delta = front_led - back_led
+    phi = np.arctan2(delta[1], delta[0])
+
+    return phi

@@ -6,6 +6,7 @@ import filters
 import util2 as util
 import model
 from matplotlib import pylab
+import measure
 
 """
 Deterministic trackers: 
@@ -165,7 +166,7 @@ def point_est_track2(img, env, eo_params):
                                                   mark_min=100, mark_max=230)
 
     im_reg_fine = filters.extract_region_filter(img, size_thold=size_thold, 
-                                                mark_min=220, mark_max=240)
+                                                mark_min=210, mark_max=240)
     im_reg_fine[im_reg_coarse ==0] = 0
     # pylab.imshow(im_reg_fine)
     # pylab.show()
@@ -178,7 +179,7 @@ def point_est_track2(img, env, eo_params):
     def none():
         return np.zeros(0, dtype=model.DTYPE_LATENT_STATE)
 
-
+    
     if len(front_c) > 0:
         back_c = find_possible_back_diodes(img, eo_params, front_c, im_reg_fine)
         print "possible back diodes", back_c
@@ -188,10 +189,12 @@ def point_est_track2(img, env, eo_params):
         print "plausible back diodes", plaus_back
 
         if len(plaus_back) > 0:
-            a = np.vstack([front_c[0], plaus_back[0]])
+            a = np.fliplr(np.vstack([front_c[0], plaus_back[0]]))
 
-            coord_means = env.gc.image_to_real(*np.mean(np.fliplr(a),
+            coord_means = env.gc.image_to_real(*np.mean(a,
                                                         axis=0))
+            phi_est = util.compute_phi(a[0], a[1])
+
         else:
             return none()
     else:
@@ -199,7 +202,7 @@ def point_est_track2(img, env, eo_params):
 
     return np.array([(coord_means[0], 
                      coord_means[1], 
-                     0, 0, 0, 0)], dtype=model.DTYPE_LATENT_STATE)
+                     0, 0, phi_est, 0)], dtype=model.DTYPE_LATENT_STATE)
 
 
 
