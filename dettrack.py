@@ -165,11 +165,14 @@ def point_est_track2(img, env, eo_params):
     im_reg_coarse = filters.extract_region_filter(img, size_thold=size_thold, 
                                                   mark_min=100, mark_max=230)
 
+    # the fine/coarse distinction == coarse finds large blobs that aren't too-large, 
+    # fine over-segments by just looking at the brightest; we take fine as our 
+    # input removing all the tiny blobs that weren't found in the course 
     im_reg_fine = filters.extract_region_filter(img, size_thold=size_thold, 
-                                                mark_min=210, mark_max=240)
+                                                mark_min=220, mark_max=240)
     im_reg_fine[im_reg_coarse ==0] = 0
-    # pylab.imshow(im_reg_fine)
-    # pylab.show()
+    #pylab.imshow(im_reg_fine)
+    #pylab.show()
 
     min_distance = DIODE_SEP
 

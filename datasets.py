@@ -35,8 +35,8 @@ CURRENT_FRAMES = [0, 500, 1000]
 
 def all():
     EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
-    for epoch in EPOCHS:
-        for frame in CURRENT_FRAMES:
+    for frame in CURRENT_FRAMES:
+        for epoch in EPOCHS:
             yield epoch, frame
 
 def bad():

@@ -50,8 +50,10 @@ def params():
 
     # for epoch in EPOCHS:
     #     for frame_start, frame_end in FRAMES:
+    MAX = 500
+    pos = 0
     for epoch, frame_start in datasets.all():
-        frame_end = frame_start + 10
+        frame_end = frame_start + 100
         infile = [os.path.join(FL_DATA, epoch), 
                   os.path.join(FL_DATA, epoch, 'config.pickle'), 
                   os.path.join(FL_DATA, epoch, 'region.pickle'), 
@@ -61,7 +63,9 @@ def params():
         outfile = 'deterministic.%s.%d-%d.pickle' % (epoch, frame_start, frame_end)
         yield (infile, outfile, epoch, 
                frame_start, frame_end)
-           
+        pos += 1
+        if pos > MAX:
+            return
  
        
 @files(params)
@@ -296,32 +300,36 @@ def aggregate_results(det_run, outfilename):
     pickle.dump(summary, open(outfilename, 'w'))
 
 @files(aggregate_results, ('deterministic.fractions.png',
-                           'deterministic.frac_vs_err.png'))
-def plot_agg(infile, (fractions_filename, frac_vs_err_filename)):
+                           'deterministic.frac_vs_err.png', 
+                           'deterministic.report.txt'))
+def plot_agg(infile, (fractions_filename, frac_vs_err_filename, 
+                      report_filename)):
     aggdata = pickle.load(open(infile, 'r'))
     
-    ## fractions
-    fracs = []
-    per_xy_errors = []
-    for epoch, data in aggdata.iteritems():
-        frac = float(data['frame_pos_pres']) / data['frame_n']
-        fracs.append(frac)
-        per_xy_errors.append(data['error_xy_mean'])
-        print epoch, data['error_xy_mean'], frac
-    fracs = np.array(fracs)
-    per_xy_errors = np.array(per_xy_errors)
+    df = pandas.DataFrame.from_dict(aggdata, orient='index')
+    df['frac'] = df['frame_pos_pres'] / df['frame_n'].astype(float)
 
-    fracs_sorted = np.sort(fracs)[::-1]
+    print df['frac']
     pylab.figure()
-    pylab.plot(fracs_sorted)
+    df2 = df.sort('frac', ascending=False)
+    pylab.plot(df2['frac'])
     pylab.savefig(fractions_filename)
 
-    fig = pylab.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.scatter(fracs, per_xy_errors)
+    fig = pylab.figure(figsize=(12, 6))
+    ax = fig.add_subplot(1, 3, 1)
+    ax.scatter(df['frac'], df['error_xy_mean'])
     ax.set_yscale('log')
-    pylab.savefig(frac_vs_err_filename)
+    ax = fig.add_subplot(1, 3, 2)
+    ax.scatter(df['frac'], df['error_xy_median'])
+    ax.set_yscale('log')
+    ax = fig.add_subplot(1, 3, 3)
+    ax.scatter(df['frac'], df['error_xy_max'])
+    ax.set_yscale('log')
+    pylab.savefig(frac_vs_err_filename, dpi=300)
 
-pipeline_run([det_run, #det_plot, 
+    df2 = df.sort('error_xy_mean')
+    open(report_filename, 'w').write(df2.to_string())
+
+pipeline_run([det_run, det_plot, 
               aggregate_results, 
-              plot_agg], multiprocess=6)
+              plot_agg], multiprocess=4)

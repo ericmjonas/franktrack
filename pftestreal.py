@@ -72,9 +72,9 @@ def params():
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in datasets.bad():
+    for epoch, frame_start in [('Dickinson_01.w1', 200)]: # datasets.bad():
 
-        frame_end = frame_start + 100
+        frame_end = frame_start + 500
         for pix_threshold in [230]:
             for config_name, config_params in LIKELIHOOD_CONFIGS:
 
@@ -619,5 +619,5 @@ def results_summarize(infiles, summary_file):
     df = pandas.DataFrame(df_rows)
     pickle.dump(df, open(summary_file, 'w'))
 
-pipeline_run([pf_run, pf_plot, #pf_render_vid, 
+pipeline_run([pf_run, pf_plot, pf_render_vid, 
               results_summarize], multiprocess=4)
