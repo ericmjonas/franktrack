@@ -72,9 +72,9 @@ def params():
     posnoise = 0.01
     velnoise = 0.05
     
-    for epoch, frame_start in [('Dickinson_01.w1', 200)]: # datasets.bad():
+    for epoch, frame_start in datasets.bad():
 
-        frame_end = frame_start + 500
+        frame_end = frame_start + 100
         for pix_threshold in [230]:
             for config_name, config_params in LIKELIHOOD_CONFIGS:
 

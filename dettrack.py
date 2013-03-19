@@ -160,19 +160,36 @@ def point_est_track2(img, env, eo_params):
     DIODE_SEP = eo_params[0]
     FRONT_SIZE = float(eo_params[1])
     BACK_SIZE = float(eo_params[2])
-    size_thold = (FRONT_SIZE+BACK_SIZE) * 2.5
-
-    im_reg_coarse = filters.extract_region_filter(img, size_thold=size_thold, 
+    size_thold = (FRONT_SIZE+BACK_SIZE) * 2 * 1.5
+    print FRONT_SIZE, BACK_SIZE, size_thold
+    im_reg_coarse = filters.extract_region_filter(img, size_thold=size_thold*1.2, 
                                                   mark_min=100, mark_max=230)
 
     # the fine/coarse distinction == coarse finds large blobs that aren't too-large, 
     # fine over-segments by just looking at the brightest; we take fine as our 
     # input removing all the tiny blobs that weren't found in the course 
     im_reg_fine = filters.extract_region_filter(img, size_thold=size_thold, 
-                                                mark_min=220, mark_max=240)
+                                                mark_min=240, mark_max=250)
+    im_reg_fine_1 = im_reg_fine.copy()
     im_reg_fine[im_reg_coarse ==0] = 0
-    #pylab.imshow(im_reg_fine)
-    #pylab.show()
+    
+    # pylab.subplot(2, 2, 1)
+    # pylab.imshow(img.copy(), interpolation='nearest', cmap=pylab.cm.gray)
+    # # coordinates = skimage.feature.peak_local_max(img, 
+    # #                                              min_distance=1,
+    # #                                              threshold_abs = 230)
+    # pylab.subplot(2, 2, 2)
+    # pylab.imshow(im_reg_fine_1)
+        
+
+    # pylab.subplot(2, 2, 3)
+    # pylab.imshow(im_reg_coarse)
+
+    # pylab.subplot(2, 2, 4)
+    # pylab.imshow(im_reg_fine)
+
+
+    # pylab.show()
 
     min_distance = DIODE_SEP
 
@@ -182,30 +199,29 @@ def point_est_track2(img, env, eo_params):
     def none():
         return np.zeros(0, dtype=model.DTYPE_LATENT_STATE)
 
-    
+    candidate_points = []
+
     if len(front_c) > 0:
         back_c = find_possible_back_diodes(img, eo_params, front_c, im_reg_fine)
-        print "possible back diodes", back_c
-        # just take the first one, because TEST
-        plaus_back = filter_plausible_points(front_c[0], back_c[0], 
-                                             eo_params[0]*2.0)
-        print "plausible back diodes", plaus_back
 
-        if len(plaus_back) > 0:
-            a = np.fliplr(np.vstack([front_c[0], plaus_back[0]]))
+        for f, b in zip(front_c, back_c):
+        
+            plaus_back = filter_plausible_points(f, b, 
+                                                 DIODE_SEP + FRONT_SIZE + BACK_SIZE)
 
-            coord_means = env.gc.image_to_real(*np.mean(a,
-                                                        axis=0))
-            phi_est = util.compute_phi(a[0], a[1])
-
-        else:
-            return none()
+            for pb in plaus_back:
+                a = np.fliplr(np.vstack([f, pb]))
+                
+                coord_means = env.gc.image_to_real(*np.mean(a,
+                                                            axis=0))
+                phi_est = util.compute_phi(a[0], a[1])
+                # FIXME compute phi
+                candidate_points.append((coord_means[0], coord_means[1], 
+                                         0, 0, phi_est, 0))
     else:
         return none()
 
-    return np.array([(coord_means[0], 
-                     coord_means[1], 
-                     0, 0, phi_est, 0)], dtype=model.DTYPE_LATENT_STATE)
+    return np.array(candidate_points, dtype=model.DTYPE_LATENT_STATE)
 
 
 

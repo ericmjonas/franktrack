@@ -52,7 +52,7 @@ def params():
     #     for frame_start, frame_end in FRAMES:
     MAX = 500
     pos = 0
-    for epoch, frame_start in datasets.all():
+    for epoch, frame_start in datasets.current():
         frame_end = frame_start + 100
         infile = [os.path.join(FL_DATA, epoch), 
                   os.path.join(FL_DATA, epoch, 'config.pickle'), 
@@ -162,10 +162,11 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     FRAME_SUBSAMPLE = int(np.ceil(FRAMEN / 30.0))
     ax_frames = f1.add_subplot(ROWN, 1, 1)
     ax_truth = f1.add_subplot(ROWN, 1, 2)
-    ax_coord_cnt = f1.add_subplot(ROWN, 1, 3)
+    ax_point_cnt = f1.add_subplot(ROWN, 1, 3)
     ax_phi_theta = f1.add_subplot(ROWN, 1, 4)
     ax_coord_filt_mean = f1.add_subplot(ROWN, 1, 5)
-    ax_img_pos = f1.add_subplot(ROWN, 1, 6)
+    ax_coord_cnt = f1.add_subplot(ROWN, 1, 6)
+    ax_img_pos = f1.add_subplot(ROWN, 1, 7)
 
     a = np.hstack(frames[::FRAME_SUBSAMPLE])
     ax_frames.imshow(a, interpolation = 'nearest', 
@@ -193,41 +194,53 @@ def det_plot((epoch_dir, epoch_config_filename, results),
         region_props.append(skimage.measure.regionprops((filtered_regions[fi]>0).astype(int)))
         
     ### how many coordinate points
-    #ax_coord_cnt.plot(frame_pos, [len(x) for x in filtered_coordinates])
-    ax_coord_cnt.plot(frame_pos, [len(x) for x in coordinates])
-
-    ### Cooridnate centroid
-    centroids = np.zeros((FRAMEN, 2))
-    for rpi, rp in enumerate(region_props):
-        if len(rp) > 0 :
-            centroid_row, centroid_col = rp[0]['Centroid']
-            centroids[rpi] = env.gc.image_to_real(centroid_col, centroid_row)
+    #ax_point_cnt.plot(frame_pos, [len(x) for x in filtered_coordinates])
+    ax_point_cnt.plot(frame_pos, [len(x) for x in coordinates])
     ax_phi_theta.plot(frame_pos, derived_truth['phi'][frame_pos] % (2*np.pi))
-    # ax_coord_centroid.plot(frame_pos, truth_interp[frame_pos]['x'], c='b')
-    # ax_coord_centroid.plot(frame_pos, truth_interp[frame_pos]['y'], c='r')
-    # ax_coord_centroid.scatter(frame_pos, centroids[:, 0], c='b', linewidth=0, s=4)
-    # ax_coord_centroid.scatter(frame_pos, centroids[:, 1], c='r', linewidth=0, s=4)
-    # ax_coord_centroid.set_xlim(np.min(frame_pos), np.max(frame_pos))
     coord = point_est_track
-    have_est = np.array([p.shape[0] > 0 for p in coord])
+
+    cand_pts_per_frame = np.array([p.shape[0] for p in coord])
+
+
+    have_est = cand_pts_per_frame > 0
+    def expand_index(inarray, cnt):
+        assert len(inarray) == len(cnt)
+        N_idx = np.sum(cnt)
+        idx_out = np.zeros(N_idx, dtype=np.uint32)
+        pos = 0
+        for i in range(len(inarray)):
+            for j in range(cnt[i]):
+                idx_out[pos] = inarray[i]
+                pos += 1
+        return idx_out
+
     frame_pos_pres = frame_pos[have_est]
     frame_pos_abs = frame_pos[np.logical_not(have_est)]
+    frame_pos_expanded = expand_index(frame_pos, cand_pts_per_frame)
 
-    coord_x = [coord[i][0]['x'] for i in np.argwhere(have_est)]
-    coord_y = [coord[i][0]['y'] for i in np.argwhere(have_est)]
-    coord_phi = np.array([coord[i][0]['phi'] for i in np.argwhere(have_est)])
-    print coord_phi
+    coord_x = np.hstack([c['x'] for c in coord])
+    coord_y = np.hstack([c['y'] for c in coord])
+
+    ax_coord_cnt.plot(frame_pos, [len(p) for p in coord])
+
     # plot x/y
     ax_coord_filt_mean.plot(frame_pos, truth_interp[frame_pos]['x'], c='b')
     ax_coord_filt_mean.plot(frame_pos, truth_interp[frame_pos]['y'], c='r')
-    ax_coord_filt_mean.scatter(frame_pos_pres, coord_x, c='b', linewidth=0, s=4)
-    ax_coord_filt_mean.scatter(frame_pos_pres, coord_y, c='r', linewidth=0, s=4)
+    ax_coord_filt_mean.scatter(frame_pos_expanded, coord_x, c='b', linewidth=1, s=7, 
+                               facecolors=None)
+    ax_coord_filt_mean.scatter(frame_pos_expanded, coord_y, c='r', linewidth=1, s=7, 
+                               facecolors=None)
     for f in frame_pos_abs:
         ax_coord_filt_mean.axvline(f, c='k', alpha=0.5)
     ax_coord_filt_mean.set_xlim(np.min(frame_pos), np.max(frame_pos))
+
+
     #plot phi
-    ax_phi_theta.scatter(frame_pos_pres, coord_phi % (2*np.pi))
+    ax_phi_theta.scatter(frame_pos_expanded, 
+                         np.hstack([c['phi'] for c in coord]) % (2*np.pi))
     ax_phi_theta.set_xlim(np.min(frame_pos), np.max(frame_pos))
+    
+
                                 
     # plot the detected points
     a = np.hstack(filtered_regions[::FRAME_SUBSAMPLE])
@@ -238,10 +251,11 @@ def det_plot((epoch_dir, epoch_config_filename, results),
     ax_img_pos.imshow(a>0, interpolation='nearest', vmin=0, vmax=1, cmap=pylab.cm.gray)    
     for pi, point in enumerate(point_est_track[::FRAME_SUBSAMPLE]):
         # convert back to pix
-        pix_x, pix_y = env.gc.real_to_image(point['x'], point['y'])
+        for x, y in zip(point['x'], point['y']):
+            pix_x, pix_y = env.gc.real_to_image(x, y)
 
-        ax_img_pos.plot([FRAME_W * pi + pix_x], 
-                        [pix_y], 'r.', ms=1.0)
+            ax_img_pos.plot([FRAME_W * pi + pix_x], 
+                            [pix_y], 'r.', ms=1.0)
 
     ax_img_pos.set_xlim([0, a.shape[1]])
     ax_img_pos.set_ylim([0, a.shape[0]])
@@ -332,4 +346,4 @@ def plot_agg(infile, (fractions_filename, frac_vs_err_filename,
 
 pipeline_run([det_run, det_plot, 
               aggregate_results, 
-              plot_agg], multiprocess=4)
+              plot_agg])# , multiprocess=4)
