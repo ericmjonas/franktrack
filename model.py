@@ -193,7 +193,7 @@ class CustomModel(models.BasicModel):
     def __init__(self, env, likelihood_evaluator, 
                  VELOCITY_NOISE_STD = 0.1, 
                  POS_NOISE_STD = 0.01, 
-                 PHI_NOISE_STD = 0.2):
+                 PHI_NOISE_STD = 0.44):
         """
         This is a basic linear evolution model with
         a generative model for the observation likelihood. 
@@ -235,7 +235,7 @@ class CustomModel(models.BasicModel):
                                         self.VELOCITY_NOISE_STD**2)
 
         score += nd(xn['phi'], x['phi'], 
-                    self.PHI_NOISE_STD)
+                    self.PHI_NOISE_STD**2)
 
         # now the theta likelihood is fun because it's like, the product
         # of two things

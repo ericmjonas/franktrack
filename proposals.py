@@ -172,21 +172,6 @@ class HigherIsotropicAndData(object):
                 std_x, std_y = self.env.gc.real_to_image(std[0], std[1])
 
                 found_points = self.img_to_points(y)
-                # pylab.figure()
-                # ax = pylab.subplot(1, 2, 1)
-                # ax.imshow(y, interpolation='nearest', cmap=pylab.cm.gray)
-                # print "V=", v
-                # e = matplotlib.patches.Ellipse((pos_x, pos_y), width= std_x, 
-                #                                height=std_y)
-                # ax.add_artist(e)
-                # ax.axhline(pos_y)
-                # ax.axvline(pos_x)
-                # ax2 = pylab.subplot(1, 2, 2)
-                # ax2.imshow(y, interpolation='nearest', cmap=pylab.cm.gray)
-                # ax2.plot([p[1] for p in found_points], [p[0] for p in found_points], 'r.')
-
-                # pylab.show()
-
 
 
                 self.gaussians[n] = m, v
@@ -272,5 +257,103 @@ class HigherIsotropicAndData(object):
 
 
         return score
+
+
+class MultimodalData(object):
+    """
+    Multimodal kernel -- takes in N points in latent-state-space and 
+    propose! 
+
+    """
+
+    
+    def __init__(self, env,
+                 img_to_points, base_proposal):
+        """
+        img_to_points is a feature-extractor that takes in a 
+        image and returns a list of candidate points. Sometimes
+        it might return zero, in which case we go with the 
+        base proposal kernel
+        """
+
+        self.img_to_points = img_to_points
+        self.env = env
+        self.base_proposal = base_proposal
+        self.POS_STD = 0.01
+        self.PHI_STD = 0.1
+        self.points = {}
+
+    def cached_candidate_points(self, y, x_prev, n):
+        """
+        assume that there's only one Y per N
+        """
+        if n in self.points:
+            return self.points[n]
+
+        self.points[n] = self.img_to_points(y)
+        return self.points[n]
+
+    def sample(self, y, x_prev, n):
+        """
+        draw a sample from the proposal conditioned on current y and
+        previous x
+        
+        """
+        candidate_points = self.cached_candidate_points(y, x_prev, n)
+
+        MIX_COMP = len(candidate_points)        
+        if MIX_COMP == 0:
+            return self.base_proposal.sample(y, x_prev, n)
+        
+        mix_i = np.random.randint(0, MIX_COMP)
+        
+        prop = candidate_points[mix_i]
+        SN = 1
+        x_next = np.zeros(SN, dtype=model.DTYPE_LATENT_STATE).view(np.recarray)
+
+        norm = np.random.normal
+        
+        x_next['x']= norm(prop['x'], self.POS_STD)
+        x_next['y'] = norm(prop['y'], self.POS_STD)
+    
+        x_next['phi'] = norm(prop['phi'], 
+                             self.PHI_STD)
+
+
+        x_next['xdot'] = x_prev['xdot']
+        x_next['ydot'] = x_prev['ydot']
+        x_next['theta'] = x_prev['theta']
+        
+        
+        return x_next[0]
+        
+    def score(self, x, y, x_prev, n):
+        """
+        Score a particular proposal 
+
+        """
+        candidate_points = self.cached_candidate_points(y, x_prev, n)
+
+        MIX_COMP = len(candidate_points)        
+        if MIX_COMP == 0:
+            return self.base_proposal.score(x, y, x_prev, n)
+        
+        score = 0.0
+        nd = ssm.util.log_norm_dens
+        scores = np.zeros(MIX_COMP)
+        for mci, mc in enumerate(candidate_points):
+            score = 0.0
+            score += nd(x['x'], mc['x'], self.POS_STD**2)
+            score += nd(x['y'], mc['y'], self.POS_STD**2)
+            # FIXME shoudl be von mises
+            score += nd(x['phi'] % 2*np.pi, mc['phi'], self.PHI_STD**2)
+            scores[mci] = score
+        const = np.ones(MIX_COMP) * np.log(1./MIX_COMP)
+        scores += const
+        score_accum = scores[0]
+        for s in scores[1:]:
+            score_accum = np.logaddexp(score_accum, s)
+            
+        return score_accum
 
 

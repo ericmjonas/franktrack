@@ -22,12 +22,13 @@ import proposals
 import filters
 import skimage.feature
 import datasets
+import dettrack
 
 from ruffus import * 
 
 T_DELTA = 1/30.
 
-LIKELIHOOD_CONFIGS = [
+MODEL_CONFIGS = [
     # ('le1', {'power' : 1, 'log' : False, 'normalize' : False}),
     # ('le2', {'power' : 2, 'log' : False, 'normalize' : False}),
     # ('le3', {'power' : 10, 'log' : False, 'normalize' : False}),
@@ -42,11 +43,9 @@ LIKELIHOOD_CONFIGS = [
     #          'exp' : False, 'normalize' : True, 
     #          'dist-thold' : None, 
     #          'closest-n' : 5}),
-    ('le9', {'power' : 2.0, 'log' : True,
-             'exp' : False, 'normalize' : True, 
-             'dist-thold' : None, 
-             'closest-n' : 50, 
-             'pix-threshold' : 0}),
+    ('lc0', {'power' : 2.0,
+             'mark-min' : 120, 
+             'mark-max' : 240}), 
     # ('le10', {'power' : 0.5, 'log' : False, 
     #          'exp' : True, 'normalize' : True, 
     #          'dist-thold' : None, 
@@ -71,12 +70,11 @@ def params():
     np.random.seed(0)
     posnoise = 0.01
     velnoise = 0.05
-    
-    for epoch, frame_start in datasets.bad():
+    for epoch, frame_start in [('Cummings_03.linear', 50)]: # datasets.bad() : # [('Cummings_01.linear', 500)]:
 
         frame_end = frame_start + 100
         for pix_threshold in [230]:
-            for config_name, config_params in LIKELIHOOD_CONFIGS:
+            for config_name, config_params in MODEL_CONFIGS:
 
                 infile = [os.path.join(FL_DATA, epoch), 
                           os.path.join(FL_DATA, epoch, 'config.pickle'), 
@@ -84,7 +82,7 @@ def params():
                           os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
                           ]
 
-                outfile = 'particles.%s.%s.%f.%f.%d.%d.%d-%d.npz' % (epoch, config_name, posnoise, 
+                outfile = 'particles.%s.%s.%3.3g.%3.3g.%d.%d.%d-%d.npz' % (epoch, config_name, posnoise, 
                                                                      velnoise, pix_threshold, 
                                                                      PARTICLEN, frame_start, frame_end)
 
@@ -126,12 +124,8 @@ def pf_run((epoch_dir, epoch_config_filename,
     tr.set_params(*eoparams)
     
     le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
-                                         likeli_params = {'power' : 1.0, 
-                                                          'pix-threshold' : pix_threshold})
+                                         likeli_params = config_params)
     
-    #le2 = likelihood.LikelihoodEvaluator3(env, tr, params=config_params)
-    
-
     
     model_inst = model.CustomModel(env, le1, 
                                    POS_NOISE_STD=posnoise,
@@ -144,9 +138,10 @@ def pf_run((epoch_dir, epoch_config_filename,
 
     prop2 = proposals.HigherIsotropic()
     def img_to_points(img):
-        return filters.peak_region_filter(img, min_distance=10)
+        return dettrack.point_est_track2(img, env, eoparams)
         
-    prop3 = proposals.HigherIsotropicAndData(env, img_to_points)
+    prop3 = proposals.MultimodalData(env, img_to_points, prop2)
+
     mpk = ssm.proposal.MixtureProposalKernel([prop2, prop3], 
                                              [0.5, 0.5])
 
@@ -376,12 +371,12 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
 def params_render_vid():
     for p in params():
-         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".avi",), p[6])
+         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".avi",), p[3])
 
 @follows(pf_run)
 @files(params_render_vid)
 def pf_render_vid((epoch_dir, epoch_config_filename, particles_file), 
-            (vid_filename,), pix_threshold):
+            (vid_filename,), (config_name, config_params)):
     
     a = np.load(particles_file)
     frame_pos = a['frame_pos']
@@ -401,6 +396,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
     tr = TemplateObj()
     tr.set_params(*eoparams)
+    region_size_thold = (tr.front_size + tr.back_size ) * 2.5
 
     STATEVARS = ['x', 'y', 'xdot', 'ydot', 'phi', 'theta']
     # convert types
@@ -427,12 +423,12 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
     WINDOW_PIX = 40
     f = pylab.figure()
-    ax_est = pylab.subplot(2,3, 1)
-    ax_particles = pylab.subplot(2, 3, 2)
-    ax_particles_global = pylab.subplot(2, 3, 3)
-    ax_rawvid = pylab.subplot(2, 3, 4)
-    ax_filt = pylab.subplot(2, 3, 5)
-    ax_scale_bars = pylab.subplot(2,3, 6)
+    ax_est = pylab.subplot(2,3, 2)
+    ax_particles = pylab.subplot(2, 3, 3)
+    ax_particles_global = pylab.subplot(2, 3, 4)
+    ax_rawvid = pylab.subplot(2, 3, 5)
+    ax_filt = pylab.subplot(2, 3, 6)
+    ax_scale_bars = pylab.subplot(2,3, 1)
 
     plot_temp_filenames = []
     for fi in range(N):
@@ -462,10 +458,11 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                                                est_y_pix, 
                                                est_phi, est_theta)
 
-
-
-
-        ax_est.imshow(frames[fi], 
+        regions = filters.extract_region_filter(frames[fi], region_size_thold, 
+                                                config_params['mark-min'], 
+                                                config_params['mark-max'])
+        
+        ax_est.imshow(regions > 0, 
                   interpolation='nearest', cmap=pylab.cm.gray)
         ax_scale_bars.imshow(frames[fi].copy(), 
                              interpolation='nearest', cmap=pylab.cm.gray)
@@ -475,20 +472,14 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
 
         # filtered image
-        coordinates = filters.peak_region_filter(frames[fi])
-        r_width = (tr.front_size + tr.back_size )*1.5
-        regions = filters.extract_region_filter(frames[fi], r_width)
+
         ax_filt.imshow(regions,
                        interpolation='nearest') # , cmap=pylab.cm.gray)
 
         #ax_filt.plot([p[1] for p in coordinates], [p[0] for p in coordinates], 'r.')
         ax_filt.set_title('ax_filt')
-        # plot the mean
-        if len(coordinates) > 0:
-            ax_filt.axhline(coordinates.mean(axis=0)[0])
-            ax_filt.axvline(coordinates.mean(axis=0)[1])
 
-        frames[fi][frames[fi] < pix_threshold] = 0
+
         ax_particles.imshow(frames[fi], 
                             interpolation='nearest', cmap=pylab.cm.gray)
 
@@ -602,9 +593,6 @@ def results_summarize(infiles, summary_file):
             dp = data['params']
             d = {'epoch' : dp[0], 
                  'likelihood_name' : dp[1][0], 
-                 'likelihood_power' : dp[1][1]['power'], 
-                 'likelihood_log' : dp[1][1]['log'], 
-                 'likelihood_normalize' : dp[1][1]['normalize'], 
                  'posnoise' : dp[2], 
                  'velnoise' : dp[3], 
                  'pix_threshold' : dp[4], 

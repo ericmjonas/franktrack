@@ -151,10 +151,9 @@ class LikelihoodEvaluator2(object):
         self.similarity = similarity
 
         self.likeli_params = {'power' : 2, 
-                              'pix-threshold' : 0, 
                               'mark-min' : 120, 
-                              'mark-max' : 230}
-        width = (self.template_obj.front_size + self.template_obj.back_size ) * 1.5
+                              'mark-max' : 240}
+        width = (self.template_obj.front_size + self.template_obj.back_size ) * 2.5
         self.likeli_params['region-size-thold'] = width
 
         if likeli_params != None:
@@ -174,13 +173,13 @@ class LikelihoodEvaluator2(object):
         phi = state['phi']
 
         if self.cached_img == None or (self.cached_img != img).any():
-            regions = filters.extract_region_filter(img, self.likeli_params['region-size-thold'], mark_min = self.likeli_params['mark-min'], 
+            regions = filters.extract_region_filter(img, 
+                                                    self.likeli_params['region-size-thold'], mark_min = self.likeli_params['mark-min'], 
                                                     mark_max = self.likeli_params['mark-max'])
                                                     
             img_thold = (regions > 0).astype(np.uint8)*255
-            img_thold = scipy.ndimage.gaussian_filter(img_thold, 4.0)
-            # pylab.figure()
-            # pylab.imshow(img_thold, interpolation='nearest', cmap=pylab.cm.gray)
+
+            # pylab.imshow(img_thold)
             # pylab.show()
             self.cached_img = img
             self.cached_img_thold = img_thold
@@ -199,8 +198,11 @@ class LikelihoodEvaluator2(object):
             MINSCORE = -1e80
             if tr_size == 0:
                 return MINSCORE
-            delta = (template_region - img_region.astype(np.float32))
-            s = - np.sum((delta)**self.likeli_params['power']) 
+            delta = (template_region.astype(np.float32) - img_region.astype(np.float32))
+            deltatot = np.sum(np.abs(delta)**self.likeli_params['power'])
+            #print deltatot
+            #s = - np.log(deltatot)
+            s = -deltatot
             s = s / tr_size
             # pylab.figure()
             # pylab.subplot(1, 2, 1)
@@ -209,30 +211,6 @@ class LikelihoodEvaluator2(object):
             # pylab.imshow(img_region)
             # pylab.title("score=%f" % s)
             # pylab.show()
-        elif self.similarity == "normcc":
-            """
-            http://en.wikipedia.org/wiki/Cross-correlation#Normalized_cross-correlation
-            """
-            MINSCORE = 0
-            if tr_size == 0:
-                return MINSCORE
-            template_mean = np.mean(template_region)
-            img_mean = np.mean(img_region)
-            si = (template_region - template_mean)*(img_region - img_mean)
-            s = np.sum(si)
-            template_std = np.std(template_region)
-            img_std = np.std(img_region)
-            if template_std <1e-7:
-                return MINSCORE
-            if img_std <1e-7:
-                return MINSCORE
-
-            s = s / (template_std * img_std)
-            s = s / tr_size
-            if 'scalar' in self.likeli_params:
-                s = s * self.likeli_params['scalar']
-            if not np.isfinite(s):
-                return MINSCORE
 
         return s
 

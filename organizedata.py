@@ -91,7 +91,6 @@ def generate_files_fl():
 
         postimestamp = os.path.join(SHANTANU_BASEDIR, expname, "day_date.postimestamp")
         epochs = glob.glob(basepath + "_*.p")
-        print "SHANTANU_EPOCHS=", epochs
         epochs_awake = []
         for e in epochs:
             if e[-3] not in ["1", "3", "5", "7", "9"]:
@@ -302,9 +301,8 @@ def package_fl_frames((postimestamp, videodir, epoch),
     end_f = np.searchsorted(pts['timestamp'], end_ts)
     
     FRAMENUM = end_f - start_f
-
     os.mkdir(frames_tar_dir)    
-    
+        
     # note that the franklab p-files are slightly different from our own
     # inference code
     pos_data_ma =  pfile_to_pos_file(epoch_p, params['frame_dim_pix'], 
@@ -398,6 +396,8 @@ def compute_region(infiles, outfile):
     pickle.dump(region, open(outfile, 'w'))
 
 if __name__ == "__main__":    
-    pipeline_run([package_fl_frames, compute_histogram, 
-                  compute_region], multiprocess=3)
+    pipeline_run([package_fl_frames,
+                  compute_histogram, 
+                  compute_region
+                  ], multiprocess=3)
     

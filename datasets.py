@@ -33,12 +33,15 @@ HARD_EPOCHS = ['Dickinson_01.w1',
 
 CURRENT_FRAMES = [0, 500, 1000]
 
-def all():
+def all(MAX = None):
     EPOCHS = [os.path.basename(f) for f in glob.glob("data/fl/*")]
+    pos = 0
     for frame in CURRENT_FRAMES:
         for epoch in EPOCHS:
             yield epoch, frame
-
+            pos += 1
+            if MAX != None and pos > MAX:
+                return 
 def bad():
     return pickle.load(open('currentset.pickle', 'r'))['bad_epochs']
 
