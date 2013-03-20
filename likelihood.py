@@ -200,10 +200,8 @@ class LikelihoodEvaluator2(object):
                 return MINSCORE
             delta = (template_region.astype(np.float32) - img_region.astype(np.float32))
             deltatot = np.sum(np.abs(delta)**self.likeli_params['power'])
-            #print deltatot
-            #s = - np.log(deltatot)
-            s = -deltatot
-            s = s / tr_size
+            s = -deltatot / tr_size
+
             # pylab.figure()
             # pylab.subplot(1, 2, 1)
             # pylab.imshow(template_region)

@@ -228,7 +228,7 @@ class CustomModel(models.BasicModel):
         nd = ssm.util.log_norm_dens
         score += nd(xn['x'], x_det, self.POS_NOISE_STD**2)
         score += nd(xn['y'], y_det, self.POS_NOISE_STD**2)
-        
+
         score += nd(xn['xdot'], x['xdot'], 
                                         self.VELOCITY_NOISE_STD**2)
         score += nd(xn['ydot'], x['ydot'], 

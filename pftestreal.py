@@ -43,7 +43,7 @@ MODEL_CONFIGS = [
     #          'exp' : False, 'normalize' : True, 
     #          'dist-thold' : None, 
     #          'closest-n' : 5}),
-    ('lc0', {'power' : 2.0,
+    ('lc0', {'power' : 1.0,
              'mark-min' : 120, 
              'mark-max' : 240}), 
     # ('le10', {'power' : 0.5, 'log' : False, 
@@ -68,29 +68,29 @@ def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
 def params():
     PARTICLEN = 200
     np.random.seed(0)
-    posnoise = 0.01
-    velnoise = 0.05
-    for epoch, frame_start in [('Cummings_03.linear', 50)]: # datasets.bad() : # [('Cummings_01.linear', 500)]:
+    for posnoise  in [0.01]:
+        for velnoise in [0.05]: # , 0.02, 0.05, 0.10]:
+            for epoch, frame_start in [('Cummings_03.linear', 50)]: # datasets.bad() : # [('Cummings_01.linear', 500)]:
 
-        frame_end = frame_start + 100
-        for pix_threshold in [230]:
-            for config_name, config_params in MODEL_CONFIGS:
-
-                infile = [os.path.join(FL_DATA, epoch), 
-                          os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                          os.path.join(FL_DATA, epoch, 'region.pickle'), 
-                          os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
-                          ]
-
-                outfile = 'particles.%s.%s.%3.3g.%3.3g.%d.%d.%d-%d.npz' % (epoch, config_name, posnoise, 
-                                                                     velnoise, pix_threshold, 
-                                                                     PARTICLEN, frame_start, frame_end)
-
-                yield (infile, outfile, epoch, 
-                       (config_name,  config_params), 
-                       posnoise, velnoise, pix_threshold, 
-                       PARTICLEN, frame_start, frame_end)
-           
+                frame_end = frame_start + 100
+                for pix_threshold in [230]:
+                    for config_name, config_params in MODEL_CONFIGS:
+                        
+                        infile = [os.path.join(FL_DATA, epoch), 
+                                  os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                                  os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                                  os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
+                                  ]
+                        
+                        outfile = 'particles.%s.%s.%3.3g.%3.3g.%d.%d.%d-%d.npz' % (epoch, config_name, posnoise, 
+                                                                                   velnoise, pix_threshold, 
+                                                                                   PARTICLEN, frame_start, frame_end)
+                        
+                        yield (infile, outfile, epoch, 
+                               (config_name,  config_params), 
+                               posnoise, velnoise, pix_threshold, 
+                               PARTICLEN, frame_start, frame_end)
+                        
 class CombinedLE(object):
     def __init__(self, LEs, weights):
         self.LEs = LEs
