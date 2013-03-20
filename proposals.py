@@ -55,8 +55,8 @@ class HigherIsotropic(ssm.proposal.Proposal):
         x_next['ydot'] = norm(x_prev['ydot'], 
                                        self.VELOCITY_NOISE_STD, size=SN)
 
-        x_next['phi'] = norm(x_prev['phi'], 
-                                       self.PHI_NOISE_STD, size=SN)
+        x_next['phi'] = util.vonmises_rv(x_prev['phi'], 
+                                         self.PHI_NOISE_STD**2)
 
 
         val, failures =  drift_reject.rej_sample(x_prev['theta'] - self.THETA_OFFSET, 
@@ -86,8 +86,8 @@ class HigherIsotropic(ssm.proposal.Proposal):
         score += nd(x['ydot'], x_prev['ydot'], 
                                         self.VELOCITY_NOISE_STD**2)
 
-        score += nd(x['phi'], x_prev['phi'], 
-                    self.PHI_NOISE_STD)
+        score += util.log_vonmises_dens(x['phi'], x_prev['phi'], 
+                                        self.PHI_NOISE_STD**2)
 
         # now the theta likelihood is fun because it's like, the product
         # of two things
@@ -316,8 +316,8 @@ class MultimodalData(object):
         x_next['x']= norm(prop['x'], self.POS_STD)
         x_next['y'] = norm(prop['y'], self.POS_STD)
     
-        x_next['phi'] = norm(prop['phi'], 
-                             self.PHI_STD)
+        x_next['phi'] = util.vonmises_rv(prop['phi'], 
+                                         self.PHI_STD**2)
 
 
         x_next['xdot'] = x_prev['xdot']
@@ -346,7 +346,8 @@ class MultimodalData(object):
             score += nd(x['x'], mc['x'], self.POS_STD**2)
             score += nd(x['y'], mc['y'], self.POS_STD**2)
             # FIXME shoudl be von mises
-            score += nd(x['phi'] % 2*np.pi, mc['phi'], self.PHI_STD**2)
+            score += util.log_vonmises_dens(x['phi'], 
+                                            mc['phi'], self.PHI_STD**2)
             scores[mci] = score
         const = np.ones(MIX_COMP) * np.log(1./MIX_COMP)
         scores += const

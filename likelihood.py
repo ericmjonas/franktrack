@@ -152,7 +152,9 @@ class LikelihoodEvaluator2(object):
 
         self.likeli_params = {'power' : 2, 
                               'mark-min' : 120, 
-                              'mark-max' : 240}
+                              'mark-max' : 240, 
+                              'transform' : None, 
+                              'multiply' : 1.0}
         width = (self.template_obj.front_size + self.template_obj.back_size ) * 2.5
         self.likeli_params['region-size-thold'] = width
 
@@ -200,7 +202,15 @@ class LikelihoodEvaluator2(object):
                 return MINSCORE
             delta = (template_region.astype(np.float32) - img_region.astype(np.float32))
             deltatot = np.sum(np.abs(delta)**self.likeli_params['power'])
-            s = -deltatot / tr_size
+            if self.likeli_params['transform'] == 'log':
+                if deltatot > 0:
+                    s = - np.log(deltatot / tr_size)
+                else:
+                    s = 0.0 
+            elif self.likeli_params['transform'] == 'exp':
+                s = - np.exp(deltatot/tr_size)
+            else:
+                s = -deltatot # / tr_size * self.likeli_params['multiply']
 
             # pylab.figure()
             # pylab.subplot(1, 2, 1)

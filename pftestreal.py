@@ -9,6 +9,7 @@ import model
 import template
 import time
 from matplotlib import pylab
+from matplotlib.collections import LineCollection
 import cloud
 import plotparticles
 import os
@@ -43,16 +44,10 @@ MODEL_CONFIGS = [
     #          'exp' : False, 'normalize' : True, 
     #          'dist-thold' : None, 
     #          'closest-n' : 5}),
-    ('lc0', {'power' : 1.0,
+    ('lc3', {'power' : 2.0,
              'mark-min' : 120, 
-             'mark-max' : 240}), 
-    # ('le10', {'power' : 0.5, 'log' : False, 
-    #          'exp' : True, 'normalize' : True, 
-    #          'dist-thold' : None, 
-    #          'closest-n' : 5}),
-    # ('le9', {'power' : 2, 'log' : True, 'normalize' : True}),
-    # ('le10', {'power' : 2, 'log' : True, 'normalize' : False}),
-    # ('le11', {'power' : 10, 'log' : True, 'normalize' : True}),
+             'mark-max' : 240, 
+             'transform' : None}), 
     ]
 
 
@@ -69,8 +64,10 @@ def params():
     PARTICLEN = 200
     np.random.seed(0)
     for posnoise  in [0.01]:
-        for velnoise in [0.05]: # , 0.02, 0.05, 0.10]:
-            for epoch, frame_start in [('Cummings_03.linear', 50)]: # datasets.bad() : # [('Cummings_01.linear', 500)]:
+        for velnoise in [0.1]: # , 0.02, 0.05, 0.10]:
+            for epoch, frame_start in [('Cummings_01.linear', 500), 
+                                       ('Cummings_03.linear', 0), 
+                                       ('Cummings_03.linear', 500)]:
 
                 frame_end = frame_start + 100
                 for pix_threshold in [230]:
@@ -224,8 +221,11 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         v_truth_interp = truth_interp_dict[v][frame_pos]
         x = frame_pos
         cred = np.zeros((len(x), 2), dtype=np.float)
+        v_range = np.zeros((len(x), 2), dtype=np.float)
         for ci, (p, w) in enumerate(zip(vals[v], weights)):
             cred[ci] = util.credible_interval(p, w)
+            v_range[ci] = util.range(p)
+            
 
         ax = pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
 
@@ -234,6 +234,10 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         ax.fill_between(x, cred[:, 0],
                            cred[:, 1], facecolor='b', 
                            alpha=0.4)
+        ax.plot(x, v_range[:, 0],
+                c = 'r')
+        ax.plot(x, v_range[:, 1],
+                c = 'r')
         # plot truth
         ax.plot(x, v_truth_interp, 
                 linewidth=1, c='k')
@@ -242,7 +246,8 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
                     np.max(v_truth_interp) + 0.1)
 
         results[v] = {'pfmean' : v_bar, 
-                      'pfcred' : cred, 
+                      'pfcred' : cred,
+                      'pfrange' : v_range, 
                       'truth' : v_truth_interp}
         
         ax.grid(1)
@@ -256,12 +261,12 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
     # now plot the # of particles consuming 95% of the prob mass
     real_particle_num = []
     for w in weights:
-        w = w / np.sum(w) # make sure they're normalized
         w = np.sort(w)[::-1] # sort, reverse order
         wcs = np.cumsum(w)
         wcsi = np.searchsorted(wcs, 0.95)
+        print wcsi
         real_particle_num.append(wcsi)
-
+        
     pylab.plot(frame_pos, real_particle_num)
 
     pylab.savefig(all_plot_filename, dpi=400)
@@ -527,15 +532,27 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
             particle_pix_pts[pi, 0] = front_pos
             particle_pix_pts[pi, 1] = back_pos
-        ax_particles.scatter(particle_pix_pts[:, 0, 0], 
-                             particle_pix_pts[:, 0, 1], 
-                             linewidth=0, 
-                             alpha = 1.0, c='g', s=1)
-        ax_particles.scatter(particle_pix_pts[:, 1, 0], 
-                             particle_pix_pts[:, 1, 1], 
-                             linewidth=0, 
-                             alpha = 1.0, c='r', s=1)
+        # ax_particles.scatter(particle_pix_pts[:, 0, 0], 
+        #                      particle_pix_pts[:, 0, 1], 
+        #                      linewidth=0, 
+        #                      alpha = 1.0, c='g', s=1)
+        # ax_particles.scatter(particle_pix_pts[:, 1, 0], 
+        #                      particle_pix_pts[:, 1, 1], 
+        #                      linewidth=0, 
+        #                      alpha = 1.0, c='r', s=1)
+        lcp = list(zip(particle_pix_pts[:, 0, :2], particle_pix_pts[:, 1, :2]))
 
+        lc = LineCollection(lcp, alpha=0.1)
+        ax_particles.add_collection(lc)
+        # ax_particles.scatter(particle_pix_pts[:, 0, 0], 
+        #                      particle_pix_pts[:, 0, 1], 
+        #                      linewidth=0, 
+        #                      alpha = 1.0, c='g', s=1)
+        # ax_particles.scatter(particle_pix_pts[:, 1, 0], 
+        #                      particle_pix_pts[:, 1, 1], 
+        #                      linewidth=0, 
+        #                      alpha = 1.0, c='r', s=1)
+        
         ax_particles_global.scatter(particle_pix_pts[:, 0, 0], 
                              particle_pix_pts[:, 0, 1], 
                              linewidth=0, 

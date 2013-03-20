@@ -118,6 +118,13 @@ def credible_interval(samples, weights,
     cs = np.cumsum(w_sorted)
     creds = np.searchsorted(cs, [lower, upper])
     return np.array(s_sorted[creds])
+
+def range(samples):
+    """
+
+    """
+
+    return np.array([np.min(samples), np.max(samples)])
     
 def chunk(l, n):
     """ Yield successive n-sized chunks from l.
@@ -190,3 +197,30 @@ def compute_phi(front_led, back_led):
     phi = np.arctan2(delta[1], delta[0])
 
     return phi
+
+def vonmises_rv(mu, disp):
+    """
+    Sample from the von mises distribution
+    Note that dispersion is analogous to variance
+
+    , and that
+    the function is often parameterized via concentration \kappa
+
+    support is [-pi, pi]
+
+    """
+    kappa = 1/disp
+    return np.random.vonmises(mu, kappa)
+
+
+def log_vonmises_dens(x, mu, disp):
+    """
+    Log of the vonmises pdf
+
+    support is [-pi, pi]
+
+    """
+    kappa = 1.0/disp
+    top = kappa * np.cos(x - mu)
+    bot = np.log(2*np.pi * scipy.special.iv(0, kappa))
+    return top - bot

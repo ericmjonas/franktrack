@@ -2,6 +2,7 @@ from ssm import models
 import ssm
 import numpy as np
 import drift_reject
+import util2 as util
 
 DTYPE_LATENT_STATE = [('x', np.float32), 
                       ('y', np.float32), 
@@ -234,9 +235,9 @@ class CustomModel(models.BasicModel):
         score += nd(xn['ydot'], x['ydot'], 
                                         self.VELOCITY_NOISE_STD**2)
 
-        score += nd(xn['phi'], x['phi'], 
-                    self.PHI_NOISE_STD**2)
-
+        score += util.log_vonmises_dens(xn['phi'], x['phi'], 
+                                         self.PHI_NOISE_STD**2)
+        
         # now the theta likelihood is fun because it's like, the product
         # of two things
         t_o = x['theta'] - self.THETA_OFFSET
@@ -300,8 +301,8 @@ class CustomModel(models.BasicModel):
         x_next['ydot'] = np.random.normal(xn['ydot'], 
                                        self.VELOCITY_NOISE_STD, size=SN)
 
-        x_next['phi'] = np.random.normal(xn['phi'], 
-                                       self.PHI_NOISE_STD, size=SN)
+        x_next['phi'] = util.vonmises_rv(xn['phi'], 
+                                         self.PHI_NOISE_STD**2)
 
 
 
