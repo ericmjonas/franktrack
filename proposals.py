@@ -302,7 +302,7 @@ class MultimodalData(object):
         candidate_points = self.cached_candidate_points(y, x_prev, n)
 
         MIX_COMP = len(candidate_points)        
-        if MIX_COMP == 0:
+        if MIX_COMP == 0 or n > 40:
             return self.base_proposal.sample(y, x_prev, n)
         
         mix_i = np.random.randint(0, MIX_COMP)
@@ -323,7 +323,7 @@ class MultimodalData(object):
         x_next['xdot'] = x_prev['xdot']
         x_next['ydot'] = x_prev['ydot']
         x_next['theta'] = x_prev['theta']
-        
+        x_next['meta'] = 1
         
         return x_next[0]
         
@@ -335,7 +335,7 @@ class MultimodalData(object):
         candidate_points = self.cached_candidate_points(y, x_prev, n)
 
         MIX_COMP = len(candidate_points)        
-        if MIX_COMP == 0:
+        if MIX_COMP == 0 or n > 40:
             return self.base_proposal.score(x, y, x_prev, n)
         
         score = 0.0

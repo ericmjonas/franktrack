@@ -9,7 +9,8 @@ DTYPE_LATENT_STATE = [('x', np.float32),
                       ('xdot', np.float32), 
                       ('ydot', np.float32), 
                       ('phi', np.float32), 
-                      ('theta', np.float32)]
+                      ('theta', np.float32), 
+                      ('meta', np.uint32)]
 
 
 class LinearModel(models.BasicModel):

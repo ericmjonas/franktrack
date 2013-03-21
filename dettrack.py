@@ -217,7 +217,7 @@ def point_est_track2(img, env, eo_params):
                 phi_est = util.compute_phi(a[0], a[1])
                 # FIXME compute phi
                 candidate_points.append((coord_means[0], coord_means[1], 
-                                         0, 0, phi_est, 0))
+                                         0, 0, phi_est, 0, 0))
     else:
         return none()
 

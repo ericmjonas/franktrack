@@ -65,28 +65,27 @@ def params():
     np.random.seed(0)
     for posnoise  in [0.01]:
         for velnoise in [0.1]: # , 0.02, 0.05, 0.10]:
-            for epoch, frame_start in [('Cummings_01.linear', 500), 
-                                       ('Cummings_03.linear', 0), 
-                                       ('Cummings_03.linear', 500)]:
+            for diode_scale in [1.0, 1.2, 1.4]:
+                for epoch, frame_start in [('Cummings_06.linear', 0)]: #datasets.bad():
 
-                frame_end = frame_start + 100
-                for pix_threshold in [230]:
-                    for config_name, config_params in MODEL_CONFIGS:
-                        
-                        infile = [os.path.join(FL_DATA, epoch), 
-                                  os.path.join(FL_DATA, epoch, 'config.pickle'), 
-                                  os.path.join(FL_DATA, epoch, 'region.pickle'), 
-                                  os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
-                                  ]
-                        
-                        outfile = 'particles.%s.%s.%3.3g.%3.3g.%d.%d.%d-%d.npz' % (epoch, config_name, posnoise, 
-                                                                                   velnoise, pix_threshold, 
-                                                                                   PARTICLEN, frame_start, frame_end)
-                        
-                        yield (infile, outfile, epoch, 
-                               (config_name,  config_params), 
-                               posnoise, velnoise, pix_threshold, 
-                               PARTICLEN, frame_start, frame_end)
+                    frame_end = frame_start + 100
+                    for pix_threshold in [230]:
+                        for config_name, config_params in MODEL_CONFIGS:
+
+                            infile = [os.path.join(FL_DATA, epoch), 
+                                      os.path.join(FL_DATA, epoch, 'config.pickle'), 
+                                      os.path.join(FL_DATA, epoch, 'region.pickle'), 
+                                      os.path.join(FL_DATA, epoch, 'led.params.pickle'), 
+                                      ]
+
+                            outfile = 'particles.%s.%s.%3.3f.%3.3f.%3.3f.%d.%d.%d-%d.npz' % (epoch, config_name, posnoise, 
+                                                                                       velnoise, diode_scale, pix_threshold, 
+                                                                                       PARTICLEN, frame_start, frame_end)
+
+                            yield (infile, outfile, epoch, 
+                                   (config_name,  config_params), 
+                                   posnoise, velnoise, pix_threshold, 
+                                   PARTICLEN, frame_start, frame_end, diode_scale)
                         
 class CombinedLE(object):
     def __init__(self, LEs, weights):
@@ -105,7 +104,7 @@ def pf_run((epoch_dir, epoch_config_filename,
            epoch, (config_name, config_params), 
            posnoise, 
            velnoise, pix_threshold, PARTICLEN, 
-           frame_start, frame_end):
+           frame_start, frame_end, diode_scale):
     np.random.seed(0)
     
     cf = pickle.load(open(epoch_config_filename, 'r'))
@@ -115,9 +114,11 @@ def pf_run((epoch_dir, epoch_config_filename,
                             cf['frame_dim_pix'])
     led_params = pickle.load(open(led_params_filename, 'r'))
 
-    eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params))
+    eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params),
+                           front_amount = diode_scale, back_amount = diode_scale)
+
     #print "EO PARAMS ARE", eoparams
-    tr = TemplateObj(0.8)
+    tr = TemplateObj(0.0)
     tr.set_params(*eoparams)
     
     le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
@@ -264,7 +265,7 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         w = np.sort(w)[::-1] # sort, reverse order
         wcs = np.cumsum(w)
         wcsi = np.searchsorted(wcs, 0.95)
-        print wcsi
+
         real_particle_num.append(wcsi)
         
     pylab.plot(frame_pos, real_particle_num)
@@ -376,12 +377,13 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
 def params_render_vid():
     for p in params():
-         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".avi",), p[3])
+         yield ((p[0][0], p[0][1], p[1]), (p[1] + ".avi",), p[3], p[10])
 
 @follows(pf_run)
 @files(params_render_vid)
 def pf_render_vid((epoch_dir, epoch_config_filename, particles_file), 
-            (vid_filename,), (config_name, config_params)):
+                  (vid_filename,), (config_name, config_params), 
+                  diode_scale):
     
     a = np.load(particles_file)
     frame_pos = a['frame_pos']
@@ -397,7 +399,8 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
                             cf['frame_dim_pix'])
     led_params = pickle.load(open(led_params_filename, 'r'))
 
-    eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params))
+    eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params), 
+                           front_amount = diode_scale, back_amount = diode_scale)
 
     tr = TemplateObj()
     tr.set_params(*eoparams)
@@ -522,6 +525,7 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
 
         # now all particles
         particle_pix_pts = np.zeros((len(particles[fi]), 2, 3), dtype=np.float)
+        particle_sources = particles[fi]['meta']
         for pi in range(len(particles[fi])):
             
             lpx, lpy = env.gc.real_to_image(particles[fi, pi]['x'], 
@@ -540,10 +544,12 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
         #                      particle_pix_pts[:, 1, 1], 
         #                      linewidth=0, 
         #                      alpha = 1.0, c='r', s=1)
-        lcp = list(zip(particle_pix_pts[:, 0, :2], particle_pix_pts[:, 1, :2]))
+        lcp = np.array((zip(particle_pix_pts[:, 0, :2], particle_pix_pts[:, 1, :2])))
 
-        lc = LineCollection(lcp, alpha=0.1)
-        ax_particles.add_collection(lc)
+        lct = LineCollection(lcp[particle_sources == 0], alpha=0.1, color='b')
+        ax_particles.add_collection(lct)
+        lcd = LineCollection(lcp[particle_sources == 1], alpha=0.1, color='r')
+        ax_particles.add_collection(lcd)
         # ax_particles.scatter(particle_pix_pts[:, 0, 0], 
         #                      particle_pix_pts[:, 0, 1], 
         #                      linewidth=0, 
