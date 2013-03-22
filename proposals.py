@@ -27,8 +27,8 @@ class HigherIsotropic(ssm.proposal.Proposal):
         self.POS_NOISE_STD = 0.01
         self.PHI_NOISE_STD = 0.3 # a good chunk of noise; units? 
 
-        self.THETA_DRIFT_SIZE = 0.01
-        self.THETA_ENVELOPE_SIZE = np.pi/32.
+        self.THETA_DRIFT_SIZE = 0.1
+        self.THETA_ENVELOPE_SIZE = np.pi/4.
         self.THETA_OFFSET = np.pi/2.
 
     def sample(self, y, x_prev, n):

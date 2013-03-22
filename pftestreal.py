@@ -55,7 +55,7 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
+def enlarge_sep(eo_params, amount=1.2, front_amount = 1.0, back_amount=1.0):
     
     b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
@@ -64,9 +64,9 @@ def params():
     PARTICLEN = 200
     np.random.seed(0)
     for posnoise  in [0.01]:
-        for velnoise in [0.1]: # , 0.02, 0.05, 0.10]:
+        for velnoise in [0.01, 0.5]: # , 0.02, 0.05, 0.10]:
             for diode_scale in [1.0, 1.2, 1.4]:
-                for epoch, frame_start in [('Cummings_06.linear', 0)]: #datasets.bad():
+                for epoch, frame_start in datasets.bad():
 
                     frame_end = frame_start + 100
                     for pix_threshold in [230]:
@@ -118,7 +118,7 @@ def pf_run((epoch_dir, epoch_config_filename,
                            front_amount = diode_scale, back_amount = diode_scale)
 
     #print "EO PARAMS ARE", eoparams
-    tr = TemplateObj(0.0)
+    tr = TemplateObj(0.8)
     tr.set_params(*eoparams)
     
     le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
@@ -187,6 +187,9 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     tr = TemplateObj()
     tr.set_params(*eoparams)
+
+    led_sep_pix = eoparams[0]
+    led_sep_m = led_sep_pix / env.gc.pix_per_meter[0]
     truth_interp, missing = measure.interpolate(truth)
 
 
@@ -206,26 +209,37 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     # build up the dictionary of true values
     derived_truth = measure.compute_derived(truth_interp, 
-                                            T_DELTA)
+                                            T_DELTA, 
+                                            led_sep_m)
     truth_interp_dict = {'x' : truth_interp['x'], 
                          'y' : truth_interp['y'], 
                          'xdot' : derived_truth['xdot'], 
                          'ydot' : derived_truth['ydot'], 
                          'phi' : derived_truth['phi'] % (2*np.pi), 
-                         'theta' : np.zeros(len(truth_interp['x']))}
+                         'theta' : np.abs(derived_truth['theta'] - np.pi/2)}
     results = {}
     
     pylab.figure(figsize=(8, 10))
     for vi, v in enumerate(STATEVARS):
         v_bar = np.average(vals[v], axis=1, weights=weights)
+        if v == "theta" :
+            v_bar = np.abs(v_bar -  np.pi / 2)
+
+
         vals_dict[v] = v_bar
         v_truth_interp = truth_interp_dict[v][frame_pos]
         x = frame_pos
         cred = np.zeros((len(x), 2), dtype=np.float)
         v_range = np.zeros((len(x), 2), dtype=np.float)
-        for ci, (p, w) in enumerate(zip(vals[v], weights)):
-            cred[ci] = util.credible_interval(p, w)
-            v_range[ci] = util.range(p)
+        if v == "theta":
+            for ci, (p, w) in enumerate(zip(vals[v], weights)):
+                p_n = np.abs(p -np.pi/2)
+                cred[ci] = util.credible_interval(p_n, w)
+                v_range[ci] = util.range(p_n)
+        else:
+            for ci, (p, w) in enumerate(zip(vals[v], weights)):
+                cred[ci] = util.credible_interval(p, w)
+                v_range[ci] = util.range(p)
             
 
         ax = pylab.subplot(len(STATEVARS) + 1,1, 1+vi)
@@ -242,9 +256,9 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         # plot truth
         ax.plot(x, v_truth_interp, 
                 linewidth=1, c='k')
-        
-        ax.set_ylim(np.min(v_truth_interp)-0.1, 
-                    np.max(v_truth_interp) + 0.1)
+        if v != 'theta':
+            ax.set_ylim(np.min(v_truth_interp)-0.1, 
+                        np.max(v_truth_interp) + 0.1)
 
         results[v] = {'pfmean' : v_bar, 
                       'pfcred' : cred,

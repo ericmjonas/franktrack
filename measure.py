@@ -69,11 +69,15 @@ def compute_phi(front, back):
     return np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
 
     
-def compute_derived(positions_interp, DELTA_T = 1.0):
+def compute_derived(positions_interp, DELTA_T = 1.0, ledsep = None):
     """
     Return velocity, phi, angular velocity
     
-    Specify the inter-frame distance 
+    Specify the inter-frame time
+
+    ledsep is the maximal distance in meters between the LEDs, 
+    and will return an "always positive direction" theta 
+    (that is, theta will range from 0 to pi/2)
     
     """
     
@@ -84,10 +88,21 @@ def compute_derived(positions_interp, DELTA_T = 1.0):
 
     xdot = np.diff(positions_interp['x']) / DELTA_T
     ydot = np.diff(positions_interp['y']) / DELTA_T
+
+    vals =  {'xdot' : xdot, 'ydot' : ydot, 
+             'phidot' : omega, 
+             'phi' : unwrapped_phi}
     
-    return {'xdot' : xdot, 'ydot' : ydot, 
-            'phidot' : omega, 
-            'phi' : unwrapped_phi}
+    if ledsep != None:
+        d1 = (positions_interp['led_front'] - positions_interp['led_back'])
+        delta = np.sqrt(np.sum(d1**2, axis=1))
+        if (delta > ledsep).any():
+            print "WARNING, delta > ledsep"
+        delta[delta>ledsep] = ledsep
+        ratio = delta / ledsep
+        vals['theta'] = np.arcsin(ratio)
+        print vals['theta'].shape
+    return vals
 
 def compute_led_sep(positions):
     delta_x = positions['led_front'][:, 0] - positions['led_back'][:, 0]
