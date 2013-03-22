@@ -55,7 +55,7 @@ FL_DATA = "data/fl"
 
 TemplateObj = template.TemplateRenderCircleBorder
 
-def enlarge_sep(eo_params, amount=1.2, front_amount = 1.0, back_amount=1.0):
+def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
     
     b = (eo_params[0]*amount, eo_params[1]*front_amount, eo_params[2]*back_amount)
     return b
@@ -64,9 +64,9 @@ def params():
     PARTICLEN = 200
     np.random.seed(0)
     for posnoise  in [0.01]:
-        for velnoise in [0.01, 0.5]: # , 0.02, 0.05, 0.10]:
-            for diode_scale in [1.0, 1.2, 1.4]:
-                for epoch, frame_start in datasets.bad():
+        for velnoise in [0.05]: # , 0.02, 0.05, 0.10]:
+            for diode_scale in [1.2]:
+                for epoch, frame_start in datasets.current():
 
                     frame_end = frame_start + 100
                     for pix_threshold in [230]:
@@ -115,6 +115,7 @@ def pf_run((epoch_dir, epoch_config_filename,
     led_params = pickle.load(open(led_params_filename, 'r'))
 
     eoparams = enlarge_sep(measure.led_params_to_EO(cf, led_params),
+                           amount = diode_scale, 
                            front_amount = diode_scale, back_amount = diode_scale)
 
     #print "EO PARAMS ARE", eoparams
@@ -274,15 +275,21 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
 
     pylab.subplot(len(STATEVARS) + 1, 1, len(STATEVARS)+1)
     # now plot the # of particles consuming 95% of the prob mass
-    real_particle_num = []
-    for w in weights:
-        w = np.sort(w)[::-1] # sort, reverse order
-        wcs = np.cumsum(w)
-        wcsi = np.searchsorted(wcs, 0.95)
-
-        real_particle_num.append(wcsi)
-        
-    pylab.plot(frame_pos, real_particle_num)
+    real_particle_num = np.zeros((len(weights), 
+                                  2), dtype=np.float32)
+    for wi, wgts in enumerate(weights):
+        wgts_idx = np.argsort(wgts)[::-1] # sort, reverse order
+        wgts_sorted = wgts[wgts_idx]
+        wcs = np.cumsum(wgts_sorted)
+        wcsi = np.searchsorted(wcs, 0.95)+1
+        # then for each of these particles, count their origin
+        for i in range(wcsi):
+            particle_proposal_src = particles[wi][i]['meta']
+            real_particle_num[wi, particle_proposal_src] += 1
+    pylab.fill_between(frame_pos, np.zeros(len(frame_pos)), 
+                       real_particle_num[:, 0], color='b')
+    pylab.fill_between(frame_pos, real_particle_num[:, 0], 
+                       real_particle_num[:, 1], color='r')
 
     pylab.savefig(all_plot_filename, dpi=400)
 
@@ -619,6 +626,8 @@ def pf_render_vid((epoch_dir, epoch_config_filename, particles_file),
     # delete extras
     for f in plot_temp_filenames:
         os.remove(f)
+
+
 
 @merge(pf_plot, 'particles.summary.pickle')
 def results_summarize(infiles, summary_file):

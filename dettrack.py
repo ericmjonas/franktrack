@@ -141,11 +141,12 @@ def filter_plausible_points(front, back_list, max_dist):
         if dist(front, b) <= max_dist:
             ret.append(b)
         else:
-            print "dist", dist(front, b), "is >= max_dist", max_dist
+            pass
+            #print "dist", dist(front, b), "is >= max_dist", max_dist
 
     return ret
 
-def point_est_track2(img, env, eo_params):
+def point_est_track2(img, env, eo_params, debug=False):
     """ 
     1. get regions / filter for things that are interesting
     2. 
@@ -161,7 +162,6 @@ def point_est_track2(img, env, eo_params):
     FRONT_SIZE = float(eo_params[1])
     BACK_SIZE = float(eo_params[2])
     size_thold = (FRONT_SIZE+BACK_SIZE) * 2 * 1.5
-    print FRONT_SIZE, BACK_SIZE, size_thold
     im_reg_coarse = filters.extract_region_filter(img, size_thold=size_thold*1.2, 
                                                   mark_min=100, mark_max=230)
 
@@ -172,24 +172,24 @@ def point_est_track2(img, env, eo_params):
                                                 mark_min=240, mark_max=250)
     im_reg_fine_1 = im_reg_fine.copy()
     im_reg_fine[im_reg_coarse ==0] = 0
-    
-    # pylab.subplot(2, 2, 1)
-    # pylab.imshow(img.copy(), interpolation='nearest', cmap=pylab.cm.gray)
-    # # coordinates = skimage.feature.peak_local_max(img, 
-    # #                                              min_distance=1,
-    # #                                              threshold_abs = 230)
-    # pylab.subplot(2, 2, 2)
-    # pylab.imshow(im_reg_fine_1)
-        
-
-    # pylab.subplot(2, 2, 3)
-    # pylab.imshow(im_reg_coarse)
-
-    # pylab.subplot(2, 2, 4)
-    # pylab.imshow(im_reg_fine)
+    if debug:
+        pylab.subplot(2, 2, 1)
+        pylab.imshow(img.copy(), interpolation='nearest', cmap=pylab.cm.gray)
+        # coordinates = skimage.feature.peak_local_max(img, 
+        #                                              min_distance=1,
+        #                                              threshold_abs = 230)
+        pylab.subplot(2, 2, 2)
+        pylab.imshow(im_reg_fine_1)
 
 
-    # pylab.show()
+        pylab.subplot(2, 2, 3)
+        pylab.imshow(im_reg_coarse)
+
+        pylab.subplot(2, 2, 4)
+        pylab.imshow(im_reg_fine)
+
+
+        pylab.show()
 
     min_distance = DIODE_SEP
 

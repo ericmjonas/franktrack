@@ -212,7 +212,7 @@ class CustomModel(models.BasicModel):
         self.PHI_NOISE_STD = PHI_NOISE_STD
 
         self.THETA_DRIFT_SIZE = 0.1
-        self.THETA_ENVELOPE_SIZE = np.pi / 4.0
+        self.THETA_ENVELOPE_SIZE = np.pi / 8.0
         self.THETA_OFFSET = np.pi/2.
         self.env = env
         self.likelihood_evaluator = likelihood_evaluator

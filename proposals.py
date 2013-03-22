@@ -28,7 +28,7 @@ class HigherIsotropic(ssm.proposal.Proposal):
         self.PHI_NOISE_STD = 0.3 # a good chunk of noise; units? 
 
         self.THETA_DRIFT_SIZE = 0.1
-        self.THETA_ENVELOPE_SIZE = np.pi/4.
+        self.THETA_ENVELOPE_SIZE = np.pi/8.
         self.THETA_OFFSET = np.pi/2.
 
     def sample(self, y, x_prev, n):
@@ -162,7 +162,6 @@ class HigherIsotropicAndData(object):
             return self.gaussians[n]
         else:
             m, v = self.compute_gaussian_interest(y)
-            print "V=", v
             if v == None:
                 self.gaussians[n] = None, None
                 return None, None
@@ -289,7 +288,7 @@ class MultimodalData(object):
         """
         if n in self.points:
             return self.points[n]
-
+        
         self.points[n] = self.img_to_points(y)
         return self.points[n]
 
@@ -302,7 +301,7 @@ class MultimodalData(object):
         candidate_points = self.cached_candidate_points(y, x_prev, n)
 
         MIX_COMP = len(candidate_points)        
-        if MIX_COMP == 0 or n > 40:
+        if MIX_COMP == 0:
             return self.base_proposal.sample(y, x_prev, n)
         
         mix_i = np.random.randint(0, MIX_COMP)
