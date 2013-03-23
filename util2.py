@@ -164,6 +164,15 @@ def extract_region_safe(a, r, c, n, defaultval = 0):
 
     return region
 
+
+def paste_array(X, r, c, Y):
+    """
+    Paste the matrix Y into X, nondestructively
+    """
+    Xcp = X.copy()
+    Xcp[r-Y.shape[0]/2:r+Y.shape[0]/2+1, c-Y.shape[1]/2:c+Y.shape[1]/2+1] = Y
+    return Xcp
+
 def render_hat_ma(H, W, x, y, size, BORDER):
     tm = np.ma.zeros((H, W), dtype=np.float32)
     for r in range(H):
@@ -177,7 +186,7 @@ def render_hat_ma(H, W, x, y, size, BORDER):
                 tm[r, c] = ma.masked
     return tm
 
-def render_hat_ma_fast(H, W, x, y, size, BORDER):
+def render_hat_ma_fast(H, W, x, y, size, BORDER, NOCARE_BORDER = 0.0):
     tm = np.ma.zeros((H, W), dtype=np.float32)
     a = np.mgrid[0:H, 0:W]
     a[0] = a[0] - x
@@ -187,7 +196,8 @@ def render_hat_ma_fast(H, W, x, y, size, BORDER):
     a = np.sum(a, axis=0)
     a = np.sqrt(a)
     tm[a < size] = 1.0
-    tm[(a >= size) * (a < (size*(1.0+BORDER)))] = 0.0
+    tm[(a >= size*(1.0)) * (a < (size*(1.0+NOCARE_BORDER)))] = ma.masked
+    tm[(a >= size*(1.0 + NOCARE_BORDER)) * (a < (size*(1.0+NOCARE_BORDER + BORDER)))] = 0.0
     tm[a >= (size*(1.0+BORDER))] = ma.masked
 
     return tm

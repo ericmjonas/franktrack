@@ -214,6 +214,7 @@ class HigherIsotropicAndData(object):
                                                  self.THETA_ENVELOPE_SIZE)
         x_next['theta'] = self.THETA_OFFSET + val
 
+        x_next['meta'] = 0
         
         
         return x_next[0]
@@ -281,7 +282,7 @@ class MultimodalData(object):
         self.POS_STD = 0.01
         self.PHI_STD = 0.1
         self.points = {}
-
+        self.DEBUG_STOP_PROPOSING = 50 # should normally be 1e100
     def cached_candidate_points(self, y, x_prev, n):
         """
         assume that there's only one Y per N
@@ -301,9 +302,8 @@ class MultimodalData(object):
         candidate_points = self.cached_candidate_points(y, x_prev, n)
 
         MIX_COMP = len(candidate_points)        
-        if MIX_COMP == 0:
+        if MIX_COMP == 0 or n > self.DEBUG_STOP_PROPOSING:
             return self.base_proposal.sample(y, x_prev, n)
-        
         mix_i = np.random.randint(0, MIX_COMP)
         
         prop = candidate_points[mix_i]
@@ -334,7 +334,7 @@ class MultimodalData(object):
         candidate_points = self.cached_candidate_points(y, x_prev, n)
 
         MIX_COMP = len(candidate_points)        
-        if MIX_COMP == 0 or n > 40:
+        if MIX_COMP == 0 or n > self.DEBUG_STOP_PROPOSING:
             return self.base_proposal.score(x, y, x_prev, n)
         
         score = 0.0

@@ -44,16 +44,17 @@ MODEL_CONFIGS = [
     #          'exp' : False, 'normalize' : True, 
     #          'dist-thold' : None, 
     #          'closest-n' : 5}),
-    ('lc3', {'power' : 2.0,
+    ('lc0', {'power' : 2.0,
              'mark-min' : 120, 
              'mark-max' : 240, 
-             'transform' : None}), 
+             'delta_scale' : 255
+             }), 
     ]
 
 
 FL_DATA = "data/fl"
 
-TemplateObj = template.TemplateRenderCircleBorder
+TemplateObj = template.TemplateRenderCircleBorder2
 
 def enlarge_sep(eo_params, amount=1.0, front_amount = 1.0, back_amount=1.0):
     
@@ -65,8 +66,8 @@ def params():
     np.random.seed(0)
     for posnoise  in [0.01]:
         for velnoise in [0.05]: # , 0.02, 0.05, 0.10]:
-            for diode_scale in [1.2]:
-                for epoch, frame_start in datasets.current():
+            for diode_scale in [1.0, 1.2]:
+                for epoch, frame_start in datasets.all():
 
                     frame_end = frame_start + 100
                     for pix_threshold in [230]:
@@ -119,7 +120,7 @@ def pf_run((epoch_dir, epoch_config_filename,
                            front_amount = diode_scale, back_amount = diode_scale)
 
     #print "EO PARAMS ARE", eoparams
-    tr = TemplateObj(0.8)
+    tr = TemplateObj(0.8, 0.4)
     tr.set_params(*eoparams)
     
     le1 = likelihood.LikelihoodEvaluator2(env, tr, similarity='dist', 
@@ -286,10 +287,11 @@ def pf_plot((epoch_dir, epoch_config_filename, particles_file),
         for i in range(wcsi):
             particle_proposal_src = particles[wi][i]['meta']
             real_particle_num[wi, particle_proposal_src] += 1
+
     pylab.fill_between(frame_pos, np.zeros(len(frame_pos)), 
                        real_particle_num[:, 0], color='b')
     pylab.fill_between(frame_pos, real_particle_num[:, 0], 
-                       real_particle_num[:, 1], color='r')
+                       real_particle_num[:, 0] + real_particle_num[:, 1], color='r')
 
     pylab.savefig(all_plot_filename, dpi=400)
 

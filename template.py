@@ -7,6 +7,7 @@ import numpy as np
 import numpy.ma as ma
 import util2 as util
 import scipy.ndimage
+import skimage.morphology
 
 def overlap(W1, W2, s):
     """
@@ -129,8 +130,9 @@ class TemplateRenderGaussian(object):
 class TemplateRenderCircleBorder(object):
     """
     """
-    def __init__(self, border=0.6):
+    def __init__(self, border=0.6, nocare_border = 0.0):
         self.border = border
+        self.nocare_border = nocare_border
 
     def set_params(self, length, front_size, back_size):
         
@@ -165,12 +167,84 @@ class TemplateRenderCircleBorder(object):
         for i, size, pos in [(0, self.front_size, front_pos), 
                              (1, self.back_size, back_pos)]:
             template[i] = util.render_hat_ma_fast(H, W, pos[1], pos[0], 
-                                                  size, self.border)
+                                                  size, self.border, 
+                                                  self.nocare_border)
 
         t =  np.sum(template, axis=0) 
         t[t > 0.1] = 1.0
 
         return t
+
+class TemplateRenderCircleBorder2(object):
+    """
+    Same as TemplateRenderCircleBorder but with skimage morphology operations
+    
+    """
+    def __init__(self, border=0.6, nocare_border = 0.0):
+        self.border = border
+        self.nocare_border = nocare_border
+
+    def set_params(self, length, front_size, back_size):
+        
+        self.length = length
+        self.front_size = front_size
+        if back_size < 1:
+            raise Exception("Too small of backsize")
+        self.back_size = back_size
+    
+    def render(self, phi, theta):
+        """
+        Returns a template where max intensity is 
+        1.0, min is 0.0, float32. The center of the 
+        returned image is the center of the diode array
+
+        """
+        
+        s = max(self.front_size, self.back_size)
+        T_D = self.length + 4*s
+        template = np.ma.zeros((2, T_D, 
+                             T_D), dtype=np.float32)
+        template_bool = np.ma.zeros((2, T_D, 
+                             T_D), dtype=np.bool)
+
+        D, W, H = template.shape
+        
+        front_pos, back_pos = util.compute_pos(self.length, 
+                                               W/2., H/2., phi, theta)
+        
+        def pos_to_int(p):
+            return np.rint(p).astype(int)
+
+        front_pos = pos_to_int(front_pos)
+        back_pos = pos_to_int(back_pos)
+
+        front_disk = skimage.morphology.disk(self.front_size)
+        back_disk = skimage.morphology.disk(self.back_size)
+        
+        # copy them to the target positions
+        
+        # initial spots
+        template_bool[0, :, :] = util.paste_array(template_bool[0], front_pos[1], 
+                                                  front_pos[0], front_disk)
+        template_bool[1, :, :] = util.paste_array(template_bool[1], back_pos[1], 
+                                                  back_pos[0], back_disk)
+        template_bool = np.sum(template_bool,
+                               axis=0)
+
+        assert template_bool.shape == (W, H)
+        template_bool[template_bool == 0] = np.ma.masked
+        template_bool[template_bool > 0] = 1
+        # now the border dialations
+        border_pix = int(np.ceil(self.border * s))
+        border_nocare_pix = int(np.ceil(self.nocare_border * s))
+        d = skimage.morphology.binary_dilation(template_bool, 
+                                               skimage.morphology.disk(border_nocare_pix))
+        border = d - template_bool
+        e = skimage.morphology.binary_dilation(d, 
+                                               skimage.morphology.disk(border_pix))
+        template_bool[(e - d) == 1] = False
+        template_bool[border] = np.ma.masked
+        return template_bool.astype(np.float32)
 
         
         

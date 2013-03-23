@@ -154,6 +154,7 @@ class LikelihoodEvaluator2(object):
                               'mark-min' : 120, 
                               'mark-max' : 240, 
                               'transform' : None, 
+                              'delta_scale' : 255, 
                               'multiply' : 1.0}
         width = (self.template_obj.front_size + self.template_obj.back_size ) * 2.5
         self.likeli_params['region-size-thold'] = width
@@ -195,22 +196,24 @@ class LikelihoodEvaluator2(object):
         img_region, template_region = template.template_select(img_thold, template_pix, 
                                                                x_pix - template_pix.shape[1]/2, 
                                                                y_pix - template_pix.shape[0]/2)
+        img_region = img_region.astype(np.float32) / 255.0
+        template_region = template_region.astype(np.float32)/255.0
         tr_size = template_region.count()
         if self.similarity == "dist":
             MINSCORE = -1e80
             if tr_size == 0:
                 return MINSCORE
-            delta = (template_region.astype(np.float32) - img_region.astype(np.float32))
+            delta = (template_region - img_region)*self.likeli_params['delta_scale']
             deltatot = np.sum(np.abs(delta)**self.likeli_params['power'])
             if self.likeli_params['transform'] == 'log':
                 if deltatot > 0:
-                    s = - np.log(deltatot / tr_size)
+                    s = - np.log(deltatot / tr_size) * self.likeli_params['multiply']
                 else:
                     s = 0.0 
             elif self.likeli_params['transform'] == 'exp':
                 s = - np.exp(deltatot/tr_size)
             else:
-                s = -deltatot # / tr_size * self.likeli_params['multiply']
+                s = -deltatot / tr_size #  * self.likeli_params['multiply']
 
             # pylab.figure()
             # pylab.subplot(1, 2, 1)
